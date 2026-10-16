@@ -22,7 +22,7 @@ function loadEnvFile() {
 
 loadEnvFile();
 
-const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/+$/, '');
+const supabaseUrl = process.env.SUPABASE_URL?.trim().replace(/\/(?:rest\/v1|storage\/v1)\/?$/i, '').replace(/\/+$/, '');
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
 const adminPassword = process.env.ADMIN_PASSWORD;
