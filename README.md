@@ -14,6 +14,8 @@ npm start
 
 Open <http://localhost:3000>. The health endpoint at <http://localhost:3000/api/health> reports whether the required settings are present. Inventory is read from Supabase; add/delete actions require the admin credentials from `.env`.
 
+The admin dashboard HTML is delivered only after a server session has been established with the configured `ADMIN_EMAIL` and `ADMIN_PASSWORD`. Inventory write routes also verify that session. The dashboard is not included in the public storefront HTML.
+
 Supabase Free has usage limits; review the current Supabase plan and do not enable billing or paid add-ons if you need to avoid charges.
 
 ## Deploy on Render
