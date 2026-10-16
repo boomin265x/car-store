@@ -237,6 +237,10 @@ footer small { justify-self: end; }
 .form-title span { color: var(--muted); float: right; font-size: 10px; }
 .product-form label { display: block; font: 10px 'DM Mono', monospace; margin: 18px 0; text-transform: uppercase; }
 .product-form input:not([type='checkbox']), .product-form select, #inventory-search { background: transparent; border: 0; border-bottom: 1px solid var(--line); display: block; margin-top: 8px; padding: 10px 0; width: 100%; }
+.product-form input[type='file'] { cursor: pointer; font: 11px 'DM Mono', monospace; }
+.form-hint { color: var(--muted); display: block; font: 10px 'DM Mono', monospace; line-height: 1.6; margin-top: 10px; text-transform: none; }
+.image-preview { background: #dedbd3; display: block; margin-top: 12px; max-height: 180px; object-fit: contain; width: 100%; }
+.image-preview[hidden] { display: none; }
 .product-form textarea { background: transparent; border: 1px solid var(--line); display: block; margin-top: 8px; padding: 10px; resize: vertical; width: 100%; }
 .product-form input:focus, .product-form select:focus, .product-form textarea:focus, #inventory-search:focus { border-color: var(--ink); outline: 0; }
 .checkbox-label { align-items: center; display: flex !important; gap: 8px; }
