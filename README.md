@@ -16,6 +16,10 @@ Open <http://localhost:3000>. The health endpoint at <http://localhost:3000/api/
 
 The admin dashboard HTML is delivered only after a server session has been established with the configured `ADMIN_EMAIL` and `ADMIN_PASSWORD`. Inventory write routes also verify that session. The dashboard is not included in the public storefront HTML.
 
+## Product images
+
+Admins can choose a JPEG, PNG, WebP, or GIF from their device when adding a product. The server verifies the admin session and image format, then uploads it to the public `product-images` Supabase Storage bucket. Images must be 5 MB or smaller. Product images are publicly viewable so they can appear on the storefront; do not upload private images.
+
 Supabase Free has usage limits; review the current Supabase plan and do not enable billing or paid add-ons if you need to avoid charges.
 
 ## Deploy on Render
