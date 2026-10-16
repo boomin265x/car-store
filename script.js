@@ -81,6 +81,7 @@ function closeCart() {
 let adminAuthenticated = false;
 let adminDashboardLoaded = false;
 let adminOrdersRefreshTimer = null;
+let adminOrders = [];
 let loginReturnFocus = null;
 let productModalReturnFocus = null;
 
@@ -132,6 +133,17 @@ async function loadAdminDashboard() {
 	adminDashboardLoaded = true;
 	wireAdminDashboard();
 	renderInventory();
+}
+
+function showAdminView(viewName) {
+	const root = document.querySelector('#admin-dashboard-root');
+	root.querySelectorAll('.admin-view').forEach(view => { view.hidden = view.id !== `admin-view-${viewName}`; });
+	root.querySelectorAll('[data-admin-view]').forEach(button => {
+		const active = button.dataset.adminView === viewName;
+		button.classList.toggle('active', active);
+		if (active) button.setAttribute('aria-current', 'page');
+		else button.removeAttribute('aria-current');
+	});
 }
 
 function renderAdminOrders(orders) {
@@ -198,6 +210,77 @@ function renderAdminOrders(orders) {
 	status.textContent = `Showing ${orders.length} customer order${orders.length === 1 ? '' : 's'}.`;
 }
 
+function renderAdminCustomers(orders) {
+	const list = document.querySelector('#admin-customers-list');
+	const count = document.querySelector('#admin-customer-count');
+	const status = document.querySelector('#customers-status');
+	const search = document.querySelector('#customer-search');
+	if (!list || !count || !status) return;
+	const customerMap = new Map();
+	orders.forEach(order => {
+		const phone = String(order.customer_phone || '');
+		const key = phone.replace(/\D/g, '') || `${order.customer_name}|${order.delivery_address}`.toLowerCase();
+		let customer = customerMap.get(key);
+		if (!customer) {
+			customer = { name: order.customer_name, phone, address: order.delivery_address, orderCount: 0, totalSpent: 0, lastOrderAt: 0 };
+			customerMap.set(key, customer);
+		}
+		customer.orderCount += 1;
+		customer.totalSpent += Number(order.subtotal) || 0;
+		const orderTime = Date.parse(order.created_at) || 0;
+		if (orderTime >= customer.lastOrderAt) {
+			customer.lastOrderAt = orderTime;
+			customer.name = order.customer_name;
+			customer.phone = phone;
+			customer.address = order.delivery_address;
+		}
+	});
+	const customers = [...customerMap.values()].sort((a, b) => b.lastOrderAt - a.lastOrderAt);
+	count.textContent = `${customers.length} customer${customers.length === 1 ? '' : 's'}`;
+	const searchTerm = (search?.value || '').trim().toLowerCase();
+	const visible = customers.filter(customer => `${customer.name} ${customer.phone} ${customer.address}`.toLowerCase().includes(searchTerm));
+	list.replaceChildren();
+	if (!visible.length) {
+		status.textContent = customers.length ? 'No customers match your search.' : 'No customers yet. Customer records appear after their first order.';
+		return;
+	}
+	visible.forEach(customer => {
+		const card = document.createElement('article');
+		card.className = 'admin-customer-card';
+		const header = document.createElement('div');
+		header.className = 'admin-customer-header';
+		const heading = document.createElement('div');
+		const name = document.createElement('h3');
+		name.textContent = customer.name || 'Customer';
+		const lastOrder = document.createElement('p');
+		lastOrder.className = 'admin-customer-date';
+		lastOrder.textContent = customer.lastOrderAt ? `Last order: ${new Date(customer.lastOrderAt).toLocaleString()}` : '';
+		heading.append(name, lastOrder);
+		header.append(heading);
+		const details = document.createElement('div');
+		details.className = 'admin-customer-details';
+		const addDetail = (label, value) => {
+			const detail = document.createElement('p');
+			const caption = document.createElement('strong');
+			caption.textContent = label;
+			detail.append(caption, document.createTextNode(value || 'Not provided'));
+			details.append(detail);
+		};
+		addDetail('Phone', customer.phone);
+		addDetail('Delivery address', customer.address);
+		const summary = document.createElement('div');
+		summary.className = 'admin-customer-summary';
+		const orderCount = document.createElement('span');
+		orderCount.textContent = `${customer.orderCount} order${customer.orderCount === 1 ? '' : 's'}`;
+		const totalSpent = document.createElement('strong');
+		totalSpent.textContent = `${formatPrice(customer.totalSpent)} spent`;
+		summary.append(orderCount, totalSpent);
+		card.append(header, details, summary);
+		list.append(card);
+	});
+	status.textContent = `Showing ${visible.length} of ${customers.length} customer${customers.length === 1 ? '' : 's'}.`;
+}
+
 async function loadAdminOrders() {
 	const root = document.querySelector('#admin-dashboard-root');
 	const list = root?.querySelector('#admin-orders-list');
@@ -210,7 +293,9 @@ async function loadAdminOrders() {
 		const response = await fetch('/api/admin/orders', { credentials: 'same-origin' });
 		const result = await response.json();
 		if (!response.ok) throw new Error(result.error || 'Could not load customer orders');
-		renderAdminOrders(result);
+		adminOrders = result;
+		renderAdminOrders(adminOrders);
+		renderAdminCustomers(adminOrders);
 	} catch (error) {
 		status.textContent = `Could not load orders: ${error.message}`;
 	} finally {
@@ -656,6 +741,8 @@ function wireAdminDashboard() {
 	});
 	root.querySelector('#inventory-search').addEventListener('input', renderInventory);
 	root.querySelector('#refresh-orders').addEventListener('click', loadAdminOrders);
+	root.querySelector('#customer-search').addEventListener('input', () => renderAdminCustomers(adminOrders));
+	root.querySelectorAll('[data-admin-view]').forEach(button => button.addEventListener('click', () => showAdminView(button.dataset.adminView)));
 	root.querySelector('#product-form').addEventListener('submit', async event => {
 		event.preventDefault();
 		const formData = new FormData(event.target);
