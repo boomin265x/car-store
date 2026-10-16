@@ -302,6 +302,15 @@ const server = http.createServer(async (request, response) => {
 				json(response, 201, createdOrder);
 				return;
 			}
+			if (request.method === 'GET' && pathname === '/api/admin/orders') {
+				if (!sessionFromRequest(request)) {
+					json(response, 401, { error: 'Sign in as an administrator to view customer orders.' });
+					return;
+				}
+				const orders = await supabaseRequest('orders?select=id,reference,customer_name,customer_phone,delivery_address,payment_method,status,subtotal,created_at,order_items(id,product_name,unit_price,quantity,line_total)&order=created_at.desc');
+				json(response, 200, orders);
+				return;
+			}
 			if (request.method === 'GET' && pathname === '/api/products') {
 				const products = await supabaseRequest('products?select=*&order=created_at.asc');
 				json(response, 200, products);
