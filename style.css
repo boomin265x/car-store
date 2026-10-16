@@ -228,6 +228,7 @@ footer small { justify-self: end; }
 .modal-purchase .button { padding: 14px 18px; }
 .admin-dashboard { background: #ebe7df; padding: 90px 8vw 110px; }
 .admin-heading { align-items: end; display: flex; justify-content: space-between; margin-bottom: 52px; }
+.admin-actions { align-items: center; display: flex; gap: 24px; }
 .admin-heading h2 { font-size: clamp(45px, 6vw, 80px); }
 .close-admin { background: transparent; border: 0; border-bottom: 1px solid var(--ink); font: 11px 'DM Mono', monospace; padding: 0 0 8px; }
 .admin-layout { display: grid; gap: 7vw; grid-template-columns: minmax(230px, 300px) 1fr; }
@@ -289,4 +290,3 @@ body { padding-bottom: 70px; }
 	*, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
 	.motion-enabled .motion-reveal { opacity: 1; transform: none; }
 }
-
