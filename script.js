@@ -80,6 +80,7 @@ function closeCart() {
 }
 let adminAuthenticated = false;
 let adminDashboardLoaded = false;
+let adminOrdersRefreshTimer = null;
 let loginReturnFocus = null;
 let productModalReturnFocus = null;
 
@@ -133,6 +134,90 @@ async function loadAdminDashboard() {
 	renderInventory();
 }
 
+function renderAdminOrders(orders) {
+	const list = document.querySelector('#admin-orders-list');
+	const count = document.querySelector('#admin-order-count');
+	const status = document.querySelector('#orders-status');
+	if (!list || !count || !status) return;
+	count.textContent = `${orders.length} order${orders.length === 1 ? '' : 's'}`;
+	list.replaceChildren();
+	if (!orders.length) {
+		status.textContent = 'No customer orders yet.';
+		return;
+	}
+	orders.forEach(order => {
+		const card = document.createElement('article');
+		card.className = 'admin-order-card';
+		const header = document.createElement('div');
+		header.className = 'admin-order-header';
+		const heading = document.createElement('div');
+		const reference = document.createElement('h3');
+		reference.textContent = order.reference || 'Order';
+		const date = document.createElement('p');
+		date.className = 'admin-order-date';
+		date.textContent = order.created_at ? new Date(order.created_at).toLocaleString() : '';
+		heading.append(reference, date);
+		const badge = document.createElement('span');
+		badge.className = 'admin-order-status';
+		badge.textContent = order.status || 'pending';
+		header.append(heading, badge);
+		const details = document.createElement('div');
+		details.className = 'admin-order-details';
+		const addDetail = (label, value) => {
+			const detail = document.createElement('p');
+			const caption = document.createElement('strong');
+			caption.textContent = label;
+			detail.append(caption, document.createTextNode(value || 'Not provided'));
+			details.append(detail);
+		};
+		addDetail('Customer', order.customer_name);
+		addDetail('Phone', order.customer_phone);
+		addDetail('Delivery address', order.delivery_address);
+		addDetail('Payment method', order.payment_method);
+		const items = document.createElement('ul');
+		items.className = 'admin-order-items';
+		(order.order_items || []).forEach(item => {
+			const line = document.createElement('li');
+			const name = document.createElement('span');
+			name.textContent = `${item.product_name} × ${item.quantity}`;
+			const amount = document.createElement('span');
+			amount.textContent = formatPrice(item.line_total);
+			line.append(name, amount);
+			items.append(line);
+		});
+		const total = document.createElement('div');
+		total.className = 'admin-order-total';
+		const totalLabel = document.createElement('span');
+		totalLabel.textContent = 'Order total';
+		const totalAmount = document.createElement('strong');
+		totalAmount.textContent = formatPrice(order.subtotal || 0);
+		total.append(totalLabel, totalAmount);
+		card.append(header, details, items, total);
+		list.append(card);
+	});
+	status.textContent = `Showing ${orders.length} customer order${orders.length === 1 ? '' : 's'}.`;
+}
+
+async function loadAdminOrders() {
+	const root = document.querySelector('#admin-dashboard-root');
+	const list = root?.querySelector('#admin-orders-list');
+	const status = root?.querySelector('#orders-status');
+	const refreshButton = root?.querySelector('#refresh-orders');
+	if (!list || !status) return;
+	if (refreshButton) refreshButton.disabled = true;
+	status.textContent = 'Loading customer orders…';
+	try {
+		const response = await fetch('/api/admin/orders', { credentials: 'same-origin' });
+		const result = await response.json();
+		if (!response.ok) throw new Error(result.error || 'Could not load customer orders');
+		renderAdminOrders(result);
+	} catch (error) {
+		status.textContent = `Could not load orders: ${error.message}`;
+	} finally {
+		if (refreshButton) refreshButton.disabled = false;
+	}
+}
+
 function readImageAsBase64(file) {
 	return new Promise((resolve, reject) => {
 		const reader = new FileReader();
@@ -151,6 +236,10 @@ async function openAdminDashboard() {
 	const dashboard = document.querySelector('#admin-dashboard');
 	dashboard.hidden = false;
 	dashboard.scrollIntoView({ behavior: 'smooth' });
+	loadAdminOrders();
+	if (!adminOrdersRefreshTimer) adminOrdersRefreshTimer = setInterval(() => {
+		if (adminAuthenticated && !dashboard.hidden) loadAdminOrders();
+	}, 30000);
 }
 
 async function restoreAdminSession() {
@@ -548,6 +637,8 @@ function wireAdminDashboard() {
 	});
 	root.querySelector('#close-admin').addEventListener('click', () => {
 		root.querySelector('#admin-dashboard').hidden = true;
+		if (adminOrdersRefreshTimer) clearInterval(adminOrdersRefreshTimer);
+		adminOrdersRefreshTimer = null;
 		document.querySelector('#shop').scrollIntoView({ behavior: 'smooth' });
 	});
 	root.querySelector('#admin-logout').addEventListener('click', async () => {
@@ -556,12 +647,15 @@ function wireAdminDashboard() {
 		} finally {
 			adminAuthenticated = false;
 			adminDashboardLoaded = false;
+			if (adminOrdersRefreshTimer) clearInterval(adminOrdersRefreshTimer);
+			adminOrdersRefreshTimer = null;
 			root.replaceChildren();
 			document.querySelector('#shop').scrollIntoView({ behavior: 'smooth' });
 			showToast('Signed out of the admin dashboard');
 		}
 	});
 	root.querySelector('#inventory-search').addEventListener('input', renderInventory);
+	root.querySelector('#refresh-orders').addEventListener('click', loadAdminOrders);
 	root.querySelector('#product-form').addEventListener('submit', async event => {
 		event.preventDefault();
 		const formData = new FormData(event.target);
