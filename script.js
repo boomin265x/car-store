@@ -133,6 +133,18 @@ async function loadAdminDashboard() {
 	renderInventory();
 }
 
+function readImageAsBase64(file) {
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader();
+		reader.addEventListener('load', () => {
+			const result = String(reader.result || '');
+			resolve(result.slice(result.indexOf(',') + 1));
+		});
+		reader.addEventListener('error', () => reject(new Error('Could not read the selected image.')));
+		reader.readAsDataURL(file);
+	});
+}
+
 async function openAdminDashboard() {
 	if (!adminAuthenticated) return openLogin();
 	await loadAdminDashboard();
@@ -520,6 +532,20 @@ document.querySelector('#password-toggle').addEventListener('click', event => {
 
 function wireAdminDashboard() {
 	const root = document.querySelector('#admin-dashboard-root');
+	const imageInput = root.querySelector('input[name="imageFile"]');
+	const imagePreview = root.querySelector('#image-preview');
+	imageInput.addEventListener('change', () => {
+		if (imagePreview.dataset.objectUrl) URL.revokeObjectURL(imagePreview.dataset.objectUrl);
+		const file = imageInput.files[0];
+		if (!file) {
+			imagePreview.removeAttribute('src');
+			imagePreview.hidden = true;
+			return;
+		}
+		imagePreview.dataset.objectUrl = URL.createObjectURL(file);
+		imagePreview.src = imagePreview.dataset.objectUrl;
+		imagePreview.hidden = false;
+	});
 	root.querySelector('#close-admin').addEventListener('click', () => {
 		root.querySelector('#admin-dashboard').hidden = true;
 		document.querySelector('#shop').scrollIntoView({ behavior: 'smooth' });
@@ -539,8 +565,20 @@ function wireAdminDashboard() {
 	root.querySelector('#product-form').addEventListener('submit', async event => {
 		event.preventDefault();
 		const formData = new FormData(event.target);
-		const product = { name: formData.get('name'), category: formData.get('category'), description: formData.get('description'), meta: formData.get('meta'), compatibility: formData.get('compatibility'), price: Number(formData.get('price')), stock: Number(formData.get('stock')), badge: formData.get('badge') ? 'New' : '', image: formData.get('image') };
+		const imageFile = formData.get('imageFile');
+		if (!(imageFile instanceof File) || !imageFile.size) return showToast('Choose a product image from your device');
+		if (imageFile.size > 5 * 1024 * 1024) return showToast('Images must be 5 MB or smaller');
+		const product = { name: formData.get('name'), category: formData.get('category'), description: formData.get('description'), meta: formData.get('meta'), compatibility: formData.get('compatibility'), price: Number(formData.get('price')), stock: Number(formData.get('stock')), badge: formData.get('badge') ? 'New' : '' };
 		try {
+			const uploadResponse = await fetch('/api/admin/images', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				credentials: 'same-origin',
+				body: JSON.stringify({ type: imageFile.type, data: await readImageAsBase64(imageFile) })
+			});
+			const uploadedImage = await uploadResponse.json();
+			if (!uploadResponse.ok) throw new Error(uploadedImage.error || 'Could not upload the product image');
+			product.image = uploadedImage.url;
 			const response = await fetch('/api/products', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -554,6 +592,9 @@ function wireAdminDashboard() {
 			renderInventory();
 			renderOffers();
 			event.target.reset();
+			if (imagePreview.dataset.objectUrl) URL.revokeObjectURL(imagePreview.dataset.objectUrl);
+			imagePreview.removeAttribute('src');
+			imagePreview.hidden = true;
 			showToast('Product added to your inventory');
 		} catch (error) {
 			showToast(`Could not add product: ${error.message}`);
