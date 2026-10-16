@@ -79,6 +79,7 @@ function closeCart() {
 	document.querySelector('#bottom-cart').focus();
 }
 let adminAuthenticated = false;
+let adminDashboardLoaded = false;
 let loginReturnFocus = null;
 let productModalReturnFocus = null;
 
@@ -113,6 +114,44 @@ function closeLogin() {
 	loginReturnFocus = null;
 }
 
+async function loadAdminDashboard() {
+	if (adminDashboardLoaded) return;
+	const response = await fetch('/api/admin/dashboard', { credentials: 'same-origin' });
+	const result = await response.text();
+	if (!response.ok) {
+		if (response.status === 401) {
+			adminAuthenticated = false;
+			openLogin();
+			throw new Error('Your admin session expired. Please sign in again.');
+		}
+		throw new Error('Could not load the admin dashboard.');
+	}
+	const root = document.querySelector('#admin-dashboard-root');
+	root.innerHTML = result;
+	adminDashboardLoaded = true;
+	wireAdminDashboard();
+	renderInventory();
+}
+
+async function openAdminDashboard() {
+	if (!adminAuthenticated) return openLogin();
+	await loadAdminDashboard();
+	const dashboard = document.querySelector('#admin-dashboard');
+	dashboard.hidden = false;
+	dashboard.scrollIntoView({ behavior: 'smooth' });
+}
+
+async function restoreAdminSession() {
+	try {
+		const response = await fetch('/api/admin/session', { credentials: 'same-origin' });
+		if (!response.ok) return;
+		const result = await response.json();
+		adminAuthenticated = result.authenticated === true;
+	} catch {
+		adminAuthenticated = false;
+	}
+}
+
 function addProductToCart(product) {
 	if (!product || product.stock <= 0) {
 		showToast('This upgrade is currently out of stock');
@@ -142,10 +181,13 @@ function renderProducts() {
 }
 
 function renderInventory() {
-	const searchTerm = document.querySelector('#inventory-search').value.toLowerCase();
+	const search = document.querySelector('#inventory-search');
+	const list = document.querySelector('#inventory-list');
+	if (!search || !list) return;
+	const searchTerm = search.value.toLowerCase();
 	const visible = products.filter(product => product.name.toLowerCase().includes(searchTerm) || product.category.includes(searchTerm));
 	document.querySelector('#inventory-count').textContent = `${products.length} item${products.length === 1 ? '' : 's'}`;
-	document.querySelector('#inventory-list').innerHTML = visible.length ? visible.map(product => `<div class="inventory-row"><img src="${product.image}" alt=""><div><strong>${product.name}</strong><small>${product.category} · ${formatPrice(product.price)} · ${product.stock} in stock</small></div><button class="delete-product" data-product-id="${product.id}" type="button" aria-label="Delete ${product.name}">Delete</button></div>`).join('') : '<p class="empty-inventory">No matching products.</p>';
+	list.innerHTML = visible.length ? visible.map(product => `<div class="inventory-row"><img src="${product.image}" alt=""><div><strong>${product.name}</strong><small>${product.category} · ${formatPrice(product.price)} · ${product.stock} in stock</small></div><button class="delete-product" data-product-id="${product.id}" type="button" aria-label="Delete ${product.name}">Delete</button></div>`).join('') : '<p class="empty-inventory">No matching products.</p>';
 }
 
 async function loadProducts() {
@@ -301,8 +343,7 @@ document.querySelector('#bottom-account').addEventListener('click', () => {
 	closeNavigationOverlays();
 	setActiveNavigation('bottom-account');
 	if (adminAuthenticated) {
-		document.querySelector('#admin-dashboard').hidden = false;
-		document.querySelector('#admin-dashboard').scrollIntoView({ behavior: 'smooth' });
+		openAdminDashboard().catch(error => showToast(error.message));
 	} else openLogin();
 });
 document.querySelector('#bottom-search').addEventListener('click', () => {
@@ -459,8 +500,14 @@ document.querySelector('#login-form').addEventListener('submit', async event => 
 	document.querySelector('.bottom-nav').hidden = false;
 	closeLogin();
 	document.querySelector('#login-form').reset();
-	window.scrollTo({ top: 0, behavior: 'smooth' });
-	showToast('Admin access granted');
+	try {
+		await openAdminDashboard();
+		showToast('Admin access granted');
+	} catch (error) {
+		adminAuthenticated = false;
+		openLogin();
+		loginError.textContent = error.message;
+	}
 });
 document.querySelector('#password-toggle').addEventListener('click', event => {
 	const passwordInput = document.querySelector('#login-password');
@@ -470,54 +517,69 @@ document.querySelector('#password-toggle').addEventListener('click', event => {
 	event.currentTarget.setAttribute('aria-pressed', String(!isVisible));
 	event.currentTarget.textContent = isVisible ? '◉' : '◎';
 });
-document.querySelector('#close-admin').addEventListener('click', () => {
-	document.querySelector('#admin-dashboard').hidden = true;
-	document.querySelector('#shop').scrollIntoView({ behavior: 'smooth' });
-});
-document.querySelector('#inventory-search').addEventListener('input', renderInventory);
-document.querySelector('#product-form').addEventListener('submit', async event => {
-	event.preventDefault();
-	const formData = new FormData(event.target);
-	const product = { name: formData.get('name'), category: formData.get('category'), description: formData.get('description'), meta: formData.get('meta'), compatibility: formData.get('compatibility'), price: Number(formData.get('price')), stock: Number(formData.get('stock')), badge: formData.get('badge') ? 'New' : '', image: formData.get('image') };
-	try {
-		const response = await fetch('/api/products', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			credentials: 'same-origin',
-			body: JSON.stringify(product)
-		});
-		const result = await response.json();
-		if (!response.ok) throw new Error(result.error || 'Could not save product');
-		products.push(result);
-		renderProducts();
-		renderInventory();
-		renderOffers();
-		event.target.reset();
-		showToast('Product added to your inventory');
-	} catch (error) {
-		showToast(`Could not add product: ${error.message}`);
-	}
-});
-document.querySelector('#inventory-list').addEventListener('click', async event => {
-	if (!event.target.matches('.delete-product')) return;
-	const product = products.find(item => item.id === event.target.dataset.productId);
-	if (!product) return;
-	try {
-		const response = await fetch(`/api/products/${encodeURIComponent(product.id)}`, {
-			method: 'DELETE',
-			credentials: 'same-origin'
-		});
-		const result = await response.json();
-		if (!response.ok) throw new Error(result.error || 'Could not delete product');
-		products = products.filter(item => item.id !== product.id);
-		renderProducts();
-		renderInventory();
-		renderOffers();
-		showToast(`${product.name} removed from inventory`);
-	} catch (error) {
-		showToast(`Could not remove product: ${error.message}`);
-	}
-});
+
+function wireAdminDashboard() {
+	const root = document.querySelector('#admin-dashboard-root');
+	root.querySelector('#close-admin').addEventListener('click', () => {
+		root.querySelector('#admin-dashboard').hidden = true;
+		document.querySelector('#shop').scrollIntoView({ behavior: 'smooth' });
+	});
+	root.querySelector('#admin-logout').addEventListener('click', async () => {
+		try {
+			await fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin' });
+		} finally {
+			adminAuthenticated = false;
+			adminDashboardLoaded = false;
+			root.replaceChildren();
+			document.querySelector('#shop').scrollIntoView({ behavior: 'smooth' });
+			showToast('Signed out of the admin dashboard');
+		}
+	});
+	root.querySelector('#inventory-search').addEventListener('input', renderInventory);
+	root.querySelector('#product-form').addEventListener('submit', async event => {
+		event.preventDefault();
+		const formData = new FormData(event.target);
+		const product = { name: formData.get('name'), category: formData.get('category'), description: formData.get('description'), meta: formData.get('meta'), compatibility: formData.get('compatibility'), price: Number(formData.get('price')), stock: Number(formData.get('stock')), badge: formData.get('badge') ? 'New' : '', image: formData.get('image') };
+		try {
+			const response = await fetch('/api/products', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				credentials: 'same-origin',
+				body: JSON.stringify(product)
+			});
+			const result = await response.json();
+			if (!response.ok) throw new Error(result.error || 'Could not save product');
+			products.push(result);
+			renderProducts();
+			renderInventory();
+			renderOffers();
+			event.target.reset();
+			showToast('Product added to your inventory');
+		} catch (error) {
+			showToast(`Could not add product: ${error.message}`);
+		}
+	});
+	root.querySelector('#inventory-list').addEventListener('click', async event => {
+		if (!event.target.matches('.delete-product')) return;
+		const product = products.find(item => item.id === event.target.dataset.productId);
+		if (!product) return;
+		try {
+			const response = await fetch(`/api/products/${encodeURIComponent(product.id)}`, {
+				method: 'DELETE',
+				credentials: 'same-origin'
+			});
+			const result = await response.json();
+			if (!response.ok) throw new Error(result.error || 'Could not delete product');
+			products = products.filter(item => item.id !== product.id);
+			renderProducts();
+			renderInventory();
+			renderOffers();
+			showToast(`${product.name} removed from inventory`);
+		} catch (error) {
+			showToast(`Could not remove product: ${error.message}`);
+		}
+	});
+}
 
 setupMotion();
 renderProducts();
@@ -525,3 +587,4 @@ renderCart();
 renderOffers();
 closeNavigationOverlays();
 loadProducts();
+restoreAdminSession();
