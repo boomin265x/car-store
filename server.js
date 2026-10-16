@@ -49,13 +49,25 @@ function sessionFromRequest(request) {
 	return token;
 }
 
-async function readJson(request) {
+async function readJson(request, maxLength = 1024 * 1024) {
 	let body = '';
 	for await (const chunk of request) {
 		body += chunk;
-		if (body.length > 1024 * 1024) throw new Error('Request body exceeds 1 MB');
+		if (body.length > maxLength) {
+			const error = new Error(`Request body exceeds ${Math.floor(maxLength / (1024 * 1024))} MB`);
+			error.status = 413;
+			throw error;
+		}
 	}
 	return JSON.parse(body);
+}
+
+function imageFormatMatches(buffer, mimeType) {
+	if (mimeType === 'image/jpeg') return buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+	if (mimeType === 'image/png') return buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+	if (mimeType === 'image/webp') return buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP';
+	if (mimeType === 'image/gif') return ['GIF87a', 'GIF89a'].includes(buffer.toString('ascii', 0, 6));
+	return false;
 }
 
 async function supabaseRequest(resource, options = {}) {
@@ -215,6 +227,49 @@ const server = http.createServer(async (request, response) => {
 			return;
 		}
 		if (pathname.startsWith('/api/')) {
+			if (request.method === 'POST' && pathname === '/api/admin/images') {
+				if (!sessionFromRequest(request)) {
+					json(response, 401, { error: 'Sign in as an administrator before uploading product images.' });
+					return;
+				}
+				if (!supabaseUrl || !serviceKey) {
+					json(response, 503, { error: 'Image storage is not configured.' });
+					return;
+				}
+				const upload = await readJson(request, 7 * 1024 * 1024);
+				const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+				if (!upload || typeof upload.data !== 'string' || !allowedTypes.has(upload.type)) {
+					json(response, 400, { error: 'Choose a JPEG, PNG, WebP, or GIF image.' });
+					return;
+				}
+				if (upload.data.length > 7 * 1024 * 1024 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(upload.data)) {
+					json(response, 400, { error: 'The selected image could not be read.' });
+					return;
+				}
+				const image = Buffer.from(upload.data, 'base64');
+				if (!image.length || image.length > 5 * 1024 * 1024) {
+					json(response, 413, { error: 'Images must be 5 MB or smaller.' });
+					return;
+				}
+				if (!imageFormatMatches(image, upload.type)) {
+					json(response, 400, { error: 'The selected file does not match its image format.' });
+					return;
+				}
+				const extension = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' }[upload.type];
+				const filePath = `${crypto.randomUUID()}.${extension}`;
+				const storageResponse = await fetch(`${supabaseUrl}/storage/v1/object/product-images/${filePath}`, {
+					method: 'POST',
+					headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': upload.type },
+					body: image
+				});
+				if (!storageResponse.ok) {
+					json(response, 502, { error: `Image upload failed (storage returned ${storageResponse.status}).` });
+					return;
+				}
+				const imageUrl = `${supabaseUrl}/storage/v1/object/public/product-images/${filePath}`;
+				json(response, 201, { path: filePath, url: imageUrl });
+				return;
+			}
 			if (request.method === 'POST' && pathname === '/api/orders') {
 				const ip = request.socket.remoteAddress || 'unknown';
 				const attempts = orderAttempts.get(ip) || { count: 0, resetAt: Date.now() + 60_000 };
