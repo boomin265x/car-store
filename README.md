@@ -4,7 +4,7 @@
 
 This project uses Node.js 20 or newer and has no npm package dependencies. Copy `.env.example` to `.env`, fill in your Supabase project URL and **service-role key**, and choose a strong admin password. Keep `.env` private; it is ignored by Git. The service-role key must only be used by this local server, never in browser code.
 
-Create a free Supabase project without enabling paid add-ons. In its SQL Editor, run [`supabase/schema.sql`](./supabase/schema.sql) to create and seed the `public.products` table. In Project Settings â†’ API Keys, copy the project URL and service-role key into `.env`.
+Create a free Supabase project without enabling paid add-ons. In its SQL Editor, run [`supabase/schema.sql`](./supabase/schema.sql) to create and seed the `public.products` table. In Project Settings → API Keys, copy the project URL and service-role key into `.env`.
 
 Then run:
 
@@ -34,4 +34,3 @@ The Blueprint currently uses Render's Free web-service plan. Free services sleep
 Checkout orders are saved to the `orders` and `order_items` tables by the server-side `create_order` database function. The function recalculates prices from inventory and reserves the requested stock in one transaction. New orders start with `pending` status. Checkout records the selected payment method but does not charge a customer or send an order notification.
 
 If Supabase was set up before order support was added, run the updated [`supabase/schema.sql`](./supabase/schema.sql) in the SQL Editor to add the order tables and function. The script is safe to rerun for the existing seeded products.
-
