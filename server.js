@@ -162,6 +162,27 @@ const server = http.createServer(async (request, response) => {
 			json(response, configured ? 200 : 503, { status: configured ? 'ready' : 'needs-configuration', supabaseConfigured: Boolean(supabaseUrl && serviceKey), adminConfigured: Boolean(adminEmail && adminPassword) });
 			return;
 		}
+		if (request.method === 'GET' && pathname === '/api/admin/session') {
+			json(response, 200, { authenticated: Boolean(sessionFromRequest(request)) });
+			return;
+		}
+		if (request.method === 'GET' && pathname === '/api/admin/dashboard') {
+			if (!sessionFromRequest(request)) {
+				json(response, 401, { error: 'Sign in with the configured admin email to view the dashboard.' });
+				return;
+			}
+			const dashboard = await fs.promises.readFile(path.join(root, 'admin-dashboard.html'), 'utf8');
+			response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+			response.end(dashboard);
+			return;
+		}
+		if (request.method === 'POST' && pathname === '/api/admin/logout') {
+			const token = sessionFromRequest(request);
+			if (token) sessions.delete(token);
+			const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+			json(response, 200, { authenticated: false }, { 'Set-Cookie': `torque_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secure}` });
+			return;
+		}
 		if (request.method === 'POST' && pathname === '/api/admin/login') {
 			if (!adminEmail || !adminPassword) {
 				json(response, 503, { error: 'Set ADMIN_EMAIL and ADMIN_PASSWORD in .env before signing in.' });
@@ -280,4 +301,3 @@ server.listen(port, () => {
 	if (!supabaseUrl || !serviceKey) console.warn('Supabase is not configured; add the values to .env before using the inventory API.');
 	if (!adminEmail || !adminPassword) console.warn('Admin credentials are not configured; set ADMIN_EMAIL and ADMIN_PASSWORD in .env.');
 });
-
