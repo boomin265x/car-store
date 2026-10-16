@@ -601,16 +601,19 @@ function wireAdminDashboard() {
 		}
 	});
 	root.querySelector('#inventory-list').addEventListener('click', async event => {
-		if (!event.target.matches('.delete-product')) return;
-		const product = products.find(item => item.id === event.target.dataset.productId);
+		const button = event.target.closest('.delete-product');
+		if (!button || button.disabled) return;
+		const product = products.find(item => item.id === button.dataset.productId);
 		if (!product) return;
+		button.disabled = true;
+		button.textContent = 'Deleting…';
 		try {
 			const response = await fetch(`/api/products/${encodeURIComponent(product.id)}`, {
 				method: 'DELETE',
 				credentials: 'same-origin'
 			});
 			const result = await response.json();
-			if (!response.ok) throw new Error(result.error || 'Could not delete product');
+			if (!response.ok || result.deleted !== true) throw new Error(result.error || 'Could not delete product');
 			products = products.filter(item => item.id !== product.id);
 			renderProducts();
 			renderInventory();
@@ -618,6 +621,8 @@ function wireAdminDashboard() {
 			showToast(`${product.name} removed from inventory`);
 		} catch (error) {
 			showToast(`Could not remove product: ${error.message}`);
+			button.disabled = false;
+			button.textContent = 'Delete';
 		}
 	});
 }
