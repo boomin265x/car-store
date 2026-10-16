@@ -332,8 +332,15 @@ const server = http.createServer(async (request, response) => {
 					json(response, 401, { error: 'Sign in as an administrator before changing inventory.' });
 					return;
 				}
-				await supabaseRequest(`products?id=eq.${encodeURIComponent(productId)}`, { method: 'DELETE' });
-				json(response, 200, { deleted: true });
+				const deleted = await supabaseRequest(`products?id=eq.${encodeURIComponent(productId)}&select=id`, {
+					method: 'DELETE',
+					headers: { Prefer: 'return=representation' }
+				});
+				if (!Array.isArray(deleted) || deleted.length === 0) {
+					json(response, 404, { error: 'Product was not found. Refresh inventory and try again.' });
+					return;
+				}
+				json(response, 200, { deleted: true, id: productId });
 				return;
 			}
 			json(response, 404, { error: 'API route not found' });
