@@ -56,7 +56,7 @@ function renderCart() {
 		const product = products.find(candidate => candidate.name === item.name);
 		const stock = product ? product.stock : 0;
 		const availability = product ? `${stock} available` : 'No longer available';
-		return `<div class="cart-item"><img src="${item.image}" alt=""><div class="cart-item-copy"><strong>${item.name}</strong><small>${formatPrice(item.price)}</small><small>${availability}</small><div class="quantity-controls"><button data-cart-action="decrease" data-product="${item.name}" type="button" aria-label="Decrease ${item.name} quantity">âˆ’</button><span>${item.quantity}</span><button data-cart-action="increase" data-product="${item.name}" type="button" aria-label="Increase ${item.name} quantity"${!product || item.quantity >= stock ? ' disabled' : ''}>+</button></div></div><button class="remove-item" data-cart-action="remove" data-product="${item.name}" type="button">Remove</button></div>`;
+		return `<div class="cart-item"><img src="${item.image}" alt=""><div class="cart-item-copy"><strong>${item.name}</strong><small>${formatPrice(item.price)}</small><small>${availability}</small><div class="quantity-controls"><button data-cart-action="decrease" data-product="${item.name}" type="button" aria-label="Decrease ${item.name} quantity">−</button><span>${item.quantity}</span><button data-cart-action="increase" data-product="${item.name}" type="button" aria-label="Increase ${item.name} quantity"${!product || item.quantity >= stock ? ' disabled' : ''}>+</button></div></div><button class="remove-item" data-cart-action="remove" data-product="${item.name}" type="button">Remove</button></div>`;
 	}).join('') : '<p class="empty-cart">Your bag is waiting for its first upgrade.</p>';
 }
 
@@ -145,7 +145,7 @@ function renderInventory() {
 	const searchTerm = document.querySelector('#inventory-search').value.toLowerCase();
 	const visible = products.filter(product => product.name.toLowerCase().includes(searchTerm) || product.category.includes(searchTerm));
 	document.querySelector('#inventory-count').textContent = `${products.length} item${products.length === 1 ? '' : 's'}`;
-	document.querySelector('#inventory-list').innerHTML = visible.length ? visible.map(product => `<div class="inventory-row"><img src="${product.image}" alt=""><div><strong>${product.name}</strong><small>${product.category} Â· ${formatPrice(product.price)} Â· ${product.stock} in stock</small></div><button class="delete-product" data-product-id="${product.id}" type="button" aria-label="Delete ${product.name}">Delete</button></div>`).join('') : '<p class="empty-inventory">No matching products.</p>';
+	document.querySelector('#inventory-list').innerHTML = visible.length ? visible.map(product => `<div class="inventory-row"><img src="${product.image}" alt=""><div><strong>${product.name}</strong><small>${product.category} · ${formatPrice(product.price)} · ${product.stock} in stock</small></div><button class="delete-product" data-product-id="${product.id}" type="button" aria-label="Delete ${product.name}">Delete</button></div>`).join('') : '<p class="empty-inventory">No matching products.</p>';
 }
 
 async function loadProducts() {
@@ -196,7 +196,7 @@ function renderOffers() {
 		const description = document.createElement('p');
 		description.textContent = product.description;
 		const details = document.createElement('small');
-		details.textContent = `${product.stock} in stock Â· ${formatPrice(product.price)}`;
+		details.textContent = `${product.stock} in stock · ${formatPrice(product.price)}`;
 		const button = document.createElement('button');
 		button.className = 'button button-dark';
 		button.type = 'button';
@@ -386,7 +386,7 @@ document.querySelector('#checkout-form').addEventListener('submit', event => {
 			confirmationItems.replaceChildren();
 			(result.items || []).forEach(item => {
 				const line = document.createElement('p');
-				line.textContent = `${item.name} Ã— ${item.quantity}`;
+				line.textContent = `${item.name} × ${item.quantity}`;
 				confirmationItems.append(line);
 			});
 			document.querySelector('#order-reference').textContent = `Order reference: ${result.reference}`;
@@ -468,7 +468,7 @@ document.querySelector('#password-toggle').addEventListener('click', event => {
 	passwordInput.type = isVisible ? 'password' : 'text';
 	event.currentTarget.setAttribute('aria-label', isVisible ? 'Show password' : 'Hide password');
 	event.currentTarget.setAttribute('aria-pressed', String(!isVisible));
-	event.currentTarget.textContent = isVisible ? 'â—‰' : 'â—Ž';
+	event.currentTarget.textContent = isVisible ? '◉' : '◎';
 });
 document.querySelector('#close-admin').addEventListener('click', () => {
 	document.querySelector('#admin-dashboard').hidden = true;
@@ -525,4 +525,3 @@ renderCart();
 renderOffers();
 closeNavigationOverlays();
 loadProducts();
-
