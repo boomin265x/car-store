@@ -26,6 +26,10 @@ const supabaseUrl = process.env.SUPABASE_URL?.trim().replace(/\/(?:rest\/v1|stor
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
 const adminPassword = process.env.ADMIN_PASSWORD;
+const payChanguSecretKey = process.env.PAYCHANGU_SECRET_KEY?.trim();
+const payChanguWebhookSecret = process.env.PAYCHANGU_WEBHOOK_SECRET?.trim();
+const publicBaseUrl = (process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${port}`).trim().replace(/\/+$/, '');
+const paymentCurrency = (process.env.PAYCHANGU_CURRENCY || 'MWK').trim().toUpperCase();
 
 function json(response, status, body, headers = {}) {
 	response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers });
@@ -60,6 +64,21 @@ async function readJson(request, maxLength = 1024 * 1024) {
 		}
 	}
 	return JSON.parse(body);
+}
+
+async function readRawBody(request, maxLength = 1024 * 1024) {
+	const chunks = [];
+	let length = 0;
+	for await (const chunk of request) {
+		length += chunk.length;
+		if (length > maxLength) {
+			const error = new Error('Request body is too large');
+			error.status = 413;
+			throw error;
+		}
+		chunks.push(chunk);
+	}
+	return Buffer.concat(chunks);
 }
 
 function imageFormatMatches(buffer, mimeType) {
@@ -101,6 +120,66 @@ async function supabaseRequest(resource, options = {}) {
 	return data;
 }
 
+async function verifyPayChanguPayment(txRef) {
+	const response = await fetch(`https://api.paychangu.com/verify-payment/${encodeURIComponent(txRef)}`, {
+		headers: { Accept: 'application/json', Authorization: `Bearer ${payChanguSecretKey}` }
+	});
+	const payload = await response.json().catch(() => null);
+	if (!response.ok || payload?.status !== 'success' || !payload?.data) {
+		const error = new Error(payload?.message || `PayChangu verification failed (${response.status})`);
+		error.status = 502;
+		throw error;
+	}
+	return payload.data;
+}
+
+async function recordVerifiedPayment(txRef) {
+	const payment = await verifyPayChanguPayment(txRef);
+	if (payment.tx_ref !== txRef || payment.currency !== paymentCurrency) return { verified: false, status: 'mismatch' };
+	const matchingOrders = await supabaseRequest(`orders?select=id,reference,subtotal,status,payment_reference&payment_reference=eq.${encodeURIComponent(txRef)}&limit=1`);
+	const order = matchingOrders?.[0];
+	if (!order) return { verified: false, status: 'order-not-found' };
+	if (Number(payment.amount) < Number(order.subtotal)) return { verified: false, status: 'amount-mismatch', order };
+	const succeeded = payment.status === 'success';
+	const paymentStatus = succeeded ? 'paid' : payment.status === 'failed' ? 'failed' : 'pending';
+	await supabaseRequest(`orders?id=eq.${encodeURIComponent(order.id)}`, {
+		method: 'PATCH',
+		headers: { Prefer: 'return=minimal' },
+		body: JSON.stringify({ payment_status: paymentStatus, ...(succeeded && order.status === 'pending' ? { status: 'confirmed' } : {}) })
+	});
+	return { verified: succeeded, status: paymentStatus, order };
+}
+
+function paymentResultPage(title, message, reference = '', paid = false) {
+	const escapeHtml = value => value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+	const safeReference = reference.replace(/[^A-Za-z0-9-]/g, '');
+	const storeUrl = paid ? '/?payment=paid' : '/';
+	return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)} · Auto Customs</title><body style="font:16px system-ui;background:#111;color:#f5f3ef;display:grid;min-height:100vh;place-items:center;margin:0"><main style="max-width:34rem;padding:2rem"><p style="color:#d98d42;letter-spacing:.12em">AUTO CUSTOMS</p><h1>${escapeHtml(title)}</h1><p>${escapeHtml(message)}</p>${safeReference ? `<p>Order reference: <strong>${safeReference}</strong></p>` : ''}<a style="color:#f0a85f" href="${storeUrl}">Return to the store</a></main></body></html>`;
+}
+
+async function handlePayChanguReturn(request, response) {
+	const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
+	let txRef = url.searchParams.get('tx_ref') || url.searchParams.get('reference');
+	if (request.method === 'POST') {
+		const rawBody = await readRawBody(request);
+		const contentType = request.headers['content-type'] || '';
+		let body = {};
+		if (contentType.includes('application/x-www-form-urlencoded')) body = Object.fromEntries(new URLSearchParams(rawBody.toString('utf8')));
+		else if (rawBody.length) body = JSON.parse(rawBody.toString('utf8'));
+		txRef = txRef || body.tx_ref || body.reference;
+	}
+	if (typeof txRef !== 'string' || txRef.length > 120 || !payChanguSecretKey) {
+		response.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+		response.end(paymentResultPage('Payment needs checking', 'We could not verify this payment yet. Please contact Auto Customs with your order reference.'));
+		return;
+	}
+	const result = await recordVerifiedPayment(txRef);
+	response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+	response.end(result.verified
+		? paymentResultPage('Payment confirmed', 'Your payment was verified and your order is confirmed.', result.order?.reference, true)
+		: paymentResultPage('Payment not confirmed', 'The payment is not verified as successful yet. Retry checkout or contact Auto Customs.', result.order?.reference));
+}
+
 function validateProduct(product) {
 	const categories = new Set(['wheels', 'audio', 'exterior', 'interior', 'tint', 'lights']);
 	if (!product || typeof product !== 'object' || Array.isArray(product)) return 'Product must be an object';
@@ -127,7 +206,7 @@ function validateOrder(order) {
 		if (typeof order[field] !== 'string' || !order[field].trim()) return `${field} is required`;
 		if (order[field].trim().length > maxLength) return `${field} is too long`;
 	}
-	if (!['Mobile Money', 'Bank transfer', 'Cash on delivery'].includes(order.payment)) return 'Choose a valid payment method';
+	if (order.payment !== 'PayChangu') return 'Choose PayChangu to continue';
 	if (!['CTS', 'SPEED', 'POST OFFICE', 'SMART DELIVERIES'].includes(order.deliveryMethod)) return 'Choose a valid delivery service';
 	if (!Array.isArray(order.items) || order.items.length < 1 || order.items.length > 20) return 'An order must contain between 1 and 20 products';
 	const productIds = new Set();
@@ -171,8 +250,8 @@ const server = http.createServer(async (request, response) => {
 	const pathname = requestUrl.pathname;
 	try {
 		if (request.method === 'GET' && pathname === '/api/health') {
-			const configured = Boolean(supabaseUrl && serviceKey && adminEmail && adminPassword);
-			json(response, configured ? 200 : 503, { status: configured ? 'ready' : 'needs-configuration', supabaseConfigured: Boolean(supabaseUrl && serviceKey), adminConfigured: Boolean(adminEmail && adminPassword) });
+			const configured = Boolean(supabaseUrl && serviceKey && adminEmail && adminPassword && payChanguSecretKey);
+			json(response, configured ? 200 : 503, { status: configured ? 'ready' : 'needs-configuration', supabaseConfigured: Boolean(supabaseUrl && serviceKey), adminConfigured: Boolean(adminEmail && adminPassword), payChanguConfigured: Boolean(payChanguSecretKey), payChanguWebhookConfigured: Boolean(payChanguWebhookSecret) });
 			return;
 		}
 		if (request.method === 'GET' && pathname === '/api/admin/session') {
@@ -227,6 +306,32 @@ const server = http.createServer(async (request, response) => {
 			json(response, 200, { authenticated: true }, { 'Set-Cookie': `torque_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${sessionLifetimeMs / 1000}${secure}` });
 			return;
 		}
+		if ((request.method === 'GET' || request.method === 'POST') && pathname === '/api/paychangu/callback') {
+			await handlePayChanguReturn(request, response);
+			return;
+		}
+		if ((request.method === 'GET' || request.method === 'POST') && pathname === '/api/paychangu/return') {
+			await handlePayChanguReturn(request, response);
+			return;
+		}
+		if (request.method === 'POST' && pathname === '/api/paychangu/webhook') {
+			if (!payChanguWebhookSecret) {
+				json(response, 503, { error: 'PayChangu webhook secret is not configured.' });
+				return;
+			}
+			const rawBody = await readRawBody(request);
+			const suppliedSignature = request.headers.signature;
+			const expectedSignature = crypto.createHmac('sha256', payChanguWebhookSecret).update(rawBody).digest('hex');
+			if (typeof suppliedSignature !== 'string' || !safeEqual(suppliedSignature.toLowerCase(), expectedSignature)) {
+				json(response, 401, { error: 'Invalid PayChangu webhook signature.' });
+				return;
+			}
+			let event;
+			try { event = JSON.parse(rawBody.toString('utf8')); } catch { json(response, 400, { error: 'Webhook payload must be valid JSON.' }); return; }
+			if (typeof event.tx_ref === 'string' && event.tx_ref.length <= 120) await recordVerifiedPayment(event.tx_ref);
+			json(response, 200, { received: true });
+			return;
+		}
 		if (pathname.startsWith('/api/')) {
 			if (request.method === 'POST' && pathname === '/api/admin/images') {
 				if (!sessionFromRequest(request)) {
@@ -272,6 +377,14 @@ const server = http.createServer(async (request, response) => {
 				return;
 			}
 			if (request.method === 'POST' && pathname === '/api/orders') {
+				if (!payChanguSecretKey) {
+					json(response, 503, { error: 'Online checkout is not configured yet. Please contact Auto Customs.' });
+					return;
+				}
+				if (!['MWK', 'USD'].includes(paymentCurrency)) {
+					json(response, 503, { error: 'PayChangu currency must be MWK or USD.' });
+					return;
+				}
 				const ip = request.socket.remoteAddress || 'unknown';
 				const attempts = orderAttempts.get(ip) || { count: 0, resetAt: Date.now() + 60_000 };
 				if (attempts.resetAt < Date.now()) {
@@ -301,7 +414,30 @@ const server = http.createServer(async (request, response) => {
 						p_items: order.items.map(item => ({ product_id: item.productId, quantity: item.quantity }))
 					})
 				});
-				json(response, 201, createdOrder);
+				const nameParts = order.customerName.trim().split(/\s+/);
+				const payChanguResponse = await fetch('https://api.paychangu.com/payment', {
+					method: 'POST',
+					headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${payChanguSecretKey}` },
+					body: JSON.stringify({
+						amount: String(createdOrder.subtotal), currency: paymentCurrency, tx_ref: createdOrder.reference,
+						first_name: nameParts[0], last_name: nameParts.slice(1).join(' '),
+						callback_url: `${publicBaseUrl}/api/paychangu/callback`, return_url: `${publicBaseUrl}/api/paychangu/return`,
+						customization: { title: 'Auto Customs order', description: `Order ${createdOrder.reference}` },
+						meta: { order_reference: createdOrder.reference }
+					})
+				});
+				const checkoutPayload = await payChanguResponse.json().catch(() => null);
+				const checkoutUrl = checkoutPayload?.data?.checkout_url;
+				if (!payChanguResponse.ok || checkoutPayload?.status !== 'success' || typeof checkoutUrl !== 'string' || !checkoutUrl.startsWith('https://')) {
+					const error = new Error(checkoutPayload?.message || `PayChangu could not start checkout (${payChanguResponse.status}).`);
+					error.status = 502;
+					throw error;
+				}
+				await supabaseRequest(`orders?id=eq.${encodeURIComponent(createdOrder.id)}`, {
+					method: 'PATCH', headers: { Prefer: 'return=minimal' },
+					body: JSON.stringify({ payment_reference: createdOrder.reference, payment_status: 'pending' })
+				});
+				json(response, 201, { ...createdOrder, paymentMethod: 'PayChangu', paymentStatus: 'pending', checkoutUrl });
 				return;
 			}
 			if (request.method === 'GET' && pathname === '/api/admin/orders') {
@@ -309,7 +445,7 @@ const server = http.createServer(async (request, response) => {
 					json(response, 401, { error: 'Sign in as an administrator to view customer orders.' });
 					return;
 				}
-				const orders = await supabaseRequest('orders?select=id,reference,customer_name,customer_phone,delivery_address,payment_method,delivery_method,status,subtotal,created_at,order_items(id,product_name,unit_price,quantity,line_total)&order=created_at.desc');
+				const orders = await supabaseRequest('orders?select=id,reference,customer_name,customer_phone,delivery_address,payment_method,payment_status,payment_reference,delivery_method,status,subtotal,created_at,order_items(id,product_name,unit_price,quantity,line_total)&order=created_at.desc');
 				json(response, 200, orders);
 				return;
 			}
