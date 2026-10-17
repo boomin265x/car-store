@@ -135,17 +135,6 @@ async function loadAdminDashboard() {
 	renderInventory();
 }
 
-function showAdminView(viewName) {
-	const root = document.querySelector('#admin-dashboard-root');
-	root.querySelectorAll('.admin-view').forEach(view => { view.hidden = view.id !== `admin-view-${viewName}`; });
-	root.querySelectorAll('[data-admin-view]').forEach(button => {
-		const active = button.dataset.adminView === viewName;
-		button.classList.toggle('active', active);
-		if (active) button.setAttribute('aria-current', 'page');
-		else button.removeAttribute('aria-current');
-	});
-}
-
 function renderAdminOrders(orders) {
 	const list = document.querySelector('#admin-orders-list');
 	const count = document.querySelector('#admin-order-count');
@@ -186,6 +175,7 @@ function renderAdminOrders(orders) {
 		addDetail('Phone', order.customer_phone);
 		addDetail('Delivery address', order.delivery_address);
 		addDetail('Payment method', order.payment_method);
+		addDetail('Payment status', order.payment_status || 'unpaid');
 		addDetail('Delivery service', order.delivery_method || 'Not recorded');
 		const items = document.createElement('ul');
 		items.className = 'admin-order-items';
@@ -280,6 +270,17 @@ function renderAdminCustomers(orders) {
 		list.append(card);
 	});
 	status.textContent = `Showing ${visible.length} of ${customers.length} customer${customers.length === 1 ? '' : 's'}.`;
+}
+
+function showAdminView(viewName) {
+	const root = document.querySelector('#admin-dashboard-root');
+	root.querySelectorAll('.admin-view').forEach(view => { view.hidden = view.id !== `admin-view-${viewName}`; });
+	root.querySelectorAll('[data-admin-view]').forEach(button => {
+		const active = button.dataset.adminView === viewName;
+		button.classList.toggle('active', active);
+		if (active) button.setAttribute('aria-current', 'page');
+		else button.removeAttribute('aria-current');
+	});
 }
 
 async function loadAdminOrders() {
@@ -592,7 +593,7 @@ document.querySelector('#checkout-form').addEventListener('submit', event => {
 	errorMessage.hidden = true;
 	errorMessage.textContent = '';
 	submitButton.disabled = true;
-	submitButton.textContent = 'Submitting order...';
+	submitButton.textContent = 'Connecting to PayChangu...';
 	(async () => {
 		try {
 			if (cart.some(item => !item.id)) throw new Error('Your bag contains an older item. Remove it and add it again before placing the order.');
@@ -604,30 +605,15 @@ document.querySelector('#checkout-form').addEventListener('submit', event => {
 					customerName: formData.get('customerName'),
 					phone: formData.get('phone'),
 					address: formData.get('address'),
-					payment: formData.get('payment'),
+					payment: 'PayChangu',
 					deliveryMethod: formData.get('deliveryMethod'),
 					items: cart.map(item => ({ productId: item.id, quantity: item.quantity }))
 				})
 			});
 			const result = await response.json();
 			if (!response.ok) throw new Error(result.error || 'Could not place your order');
-
-			const confirmationItems = document.querySelector('#confirmation-items');
-			confirmationItems.replaceChildren();
-			(result.items || []).forEach(item => {
-				const line = document.createElement('p');
-				line.textContent = `${item.name} × ${item.quantity}`;
-				confirmationItems.append(line);
-			});
-			document.querySelector('#order-reference').textContent = `Order reference: ${result.reference}`;
-			document.querySelector('#confirmation-delivery-method').textContent = result.deliveryMethod || formData.get('deliveryMethod');
-			document.querySelector('#confirmation-total').textContent = formatPrice(result.subtotal);
-			form.hidden = true;
-			document.querySelector('#order-confirmation').hidden = false;
-			cart = [];
-			saveCart();
-			loadProducts();
-			showToast('Order received');
+			if (typeof result.checkoutUrl !== 'string' || !result.checkoutUrl.startsWith('https://')) throw new Error('PayChangu did not return a valid checkout link.');
+			window.location.assign(result.checkoutUrl);
 		} catch (error) {
 			errorMessage.textContent = error.message;
 			errorMessage.hidden = false;
@@ -815,6 +801,11 @@ function wireAdminDashboard() {
 }
 
 setupMotion();
+if (new URLSearchParams(window.location.search).get('payment') === 'paid') {
+	cart = [];
+	localStorage.removeItem('torque-cart');
+	window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+}
 renderProducts();
 renderCart();
 renderOffers();

@@ -30,6 +30,8 @@ The [`render.yaml`](./render.yaml) Blueprint configures this app as a Node web s
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `ADMIN_EMAIL`
 - `ADMIN_PASSWORD`
+- `PAYCHANGU_SECRET_KEY` (start with the test secret key)
+- `PAYCHANGU_WEBHOOK_SECRET` (the Web Secret Key shown in PayChangu API & Webhooks settings)
 
 Keep the service-role key in Render's environment settings only; never put it in browser code or commit `.env`. After deployment, `/api/health` should report `ready`.
 
@@ -37,6 +39,8 @@ The Blueprint currently uses Render's Free web-service plan. Free services sleep
 
 ## Orders
 
-Checkout orders are saved to the `orders` and `order_items` tables by the server-side `create_order` database function. The function recalculates prices from inventory and reserves the requested stock in one transaction. New orders start with `pending` status. Checkout records the selected payment method but does not charge a customer or send an order notification. Customers must also choose CTS, SPEED, POST OFFICE, or SMART DELIVERIES. The selected service is saved with the order and shown in the admin Orders view.
+Checkout orders are saved to the `orders` and `order_items` tables by the server-side `create_order` database function. It recalculates prices from inventory and reserves requested stock in one transaction. Customers choose CTS, SPEED, POST OFFICE, or SMART DELIVERIES, then continue to PayChangu hosted checkout. The server marks an order paid only after verifying the transaction with PayChangu. The admin Orders view shows payment status. PayChangu webhook requests are authenticated with the webhook signature and re-verified with PayChangu.
 
-If Supabase was set up before order support was added, run the updated [`supabase/schema.sql`](./supabase/schema.sql) in the SQL Editor to add the order tables and function. The script is safe to rerun for the existing seeded products.
+If Supabase was set up before payment support was added, run the updated [`supabase/schema.sql`](./supabase/schema.sql) in the SQL Editor to add payment status and reference columns and update the order function. The script is safe to rerun for the existing seeded products.
+
+In PayChangu, copy the **test API secret key** into `PAYCHANGU_SECRET_KEY`. Under Settings â†’ API & Webhooks, configure `https://<your-render-service>/api/paychangu/webhook` as a webhook and copy its Web Secret Key into `PAYCHANGU_WEBHOOK_SECRET`. The callback and return URLs are sent with each hosted checkout session. Keep both keys in Render's environment settings or your local `.env`; never put them in browser code or GitHub. Test successful, failed, and cancelled payments before replacing the test key with a live key after PayChangu approves the merchant account.
