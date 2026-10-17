@@ -128,6 +128,7 @@ function validateOrder(order) {
 		if (order[field].trim().length > maxLength) return `${field} is too long`;
 	}
 	if (!['Mobile Money', 'Bank transfer', 'Cash on delivery'].includes(order.payment)) return 'Choose a valid payment method';
+	if (!['CTS', 'SPEED', 'POST OFFICE', 'SMART DELIVERIES'].includes(order.deliveryMethod)) return 'Choose a valid delivery service';
 	if (!Array.isArray(order.items) || order.items.length < 1 || order.items.length > 20) return 'An order must contain between 1 and 20 products';
 	const productIds = new Set();
 	for (const item of order.items) {
@@ -296,6 +297,7 @@ const server = http.createServer(async (request, response) => {
 						p_customer_phone: order.phone.trim(),
 						p_delivery_address: order.address.trim(),
 						p_payment_method: order.payment,
+						p_delivery_method: order.deliveryMethod,
 						p_items: order.items.map(item => ({ product_id: item.productId, quantity: item.quantity }))
 					})
 				});
@@ -307,7 +309,7 @@ const server = http.createServer(async (request, response) => {
 					json(response, 401, { error: 'Sign in as an administrator to view customer orders.' });
 					return;
 				}
-				const orders = await supabaseRequest('orders?select=id,reference,customer_name,customer_phone,delivery_address,payment_method,status,subtotal,created_at,order_items(id,product_name,unit_price,quantity,line_total)&order=created_at.desc');
+				const orders = await supabaseRequest('orders?select=id,reference,customer_name,customer_phone,delivery_address,payment_method,delivery_method,status,subtotal,created_at,order_items(id,product_name,unit_price,quantity,line_total)&order=created_at.desc');
 				json(response, 200, orders);
 				return;
 			}
