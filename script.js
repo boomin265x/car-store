@@ -38,7 +38,7 @@ function observeRevealElements(root = document) {
 function setupMotion() {
 	if (!revealObserver) return;
 	document.body.classList.add('motion-enabled');
-	document.querySelectorAll('.site-header, .shop-section .section-heading, .shop-toolbar, .feature-image, .feature-copy, .store-info-heading, .store-info-card, footer')
+	document.querySelectorAll('.site-header, .shop-section .section-heading, .shop-toolbar, .store-info-heading, .store-info-card, footer')
 		.forEach(element => element.classList.add('motion-reveal'));
 	observeRevealElements();
 }
