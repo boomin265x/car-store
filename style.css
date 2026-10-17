@@ -226,7 +226,15 @@ footer small { justify-self: end; }
 .modal-purchase { align-items: center; display: flex; justify-content: space-between; margin-top: 28px; }
 .modal-purchase > strong { font: 500 16px 'DM Mono', monospace; }
 .modal-purchase .button { padding: 14px 18px; }
-.admin-dashboard { background: #ebe7df; padding: 90px 8vw 110px; }
+body.admin-mode { background: #ebe7df; }
+body.admin-mode .site-header,
+body.admin-mode #shop,
+body.admin-mode .feature-band,
+body.admin-mode .store-info,
+body.admin-mode footer,
+body.admin-mode .bottom-nav { display: none !important; }
+body.admin-mode #admin-dashboard-root { min-height: 100vh; }
+.admin-dashboard { background: #ebe7df; min-height: 100vh; padding: 50px 8vw 80px; }
 .admin-heading { align-items: end; display: flex; justify-content: space-between; margin-bottom: 52px; }
 .admin-actions { align-items: center; display: flex; gap: 24px; }
 .admin-heading h2 { font-size: clamp(45px, 6vw, 80px); }
