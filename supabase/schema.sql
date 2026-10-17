@@ -36,18 +36,29 @@ create table if not exists public.orders (
     delivery_address text not null,
     payment_method text not null check (payment_method in ('Mobile Money', 'Bank transfer', 'Cash on delivery')),
     delivery_method text check (delivery_method is null or delivery_method in ('CTS', 'SPEED', 'POST OFFICE', 'SMART DELIVERIES')),
-    status not null default 'pending' check (status in ('pending', 'confirmed', 'cancelled', 'fulfilled')),
+    status text not null default 'pending' check (status in ('pending', 'confirmed', 'cancelled', 'fulfilled')),
     subtotal bigint not null default 0 check (subtotal >= 0),
     created_at timestamptz not null default now()
 );
 
+alter table public.orders add column if not exists payment_status text not null default 'unpaid';
+alter table public.orders add column if not exists payment_reference text;
+alter table public.orders drop constraint if exists orders_payment_method_check;
+alter table public.orders add constraint orders_payment_method_check
+    check (payment_method in ('PayChangu', 'Mobile Money', 'Bank transfer', 'Cash on delivery'));
+alter table public.orders drop constraint if exists orders_payment_status_check;
+alter table public.orders add constraint orders_payment_status_check
+    check (payment_status in ('unpaid', 'pending', 'paid', 'failed'));
+create unique index if not exists orders_payment_reference_unique
+    on public.orders (payment_reference) where payment_reference is not null;
+
 alter table public.orders add column if not exists delivery_method text;
-do $ begin
+do $$ begin
     if not exists (select 1 from pg_constraint where conname = 'orders_delivery_method_check' and conrelid = 'public.orders'::regclass) then
         alter table public.orders add constraint orders_delivery_method_check
         check (delivery_method is null or delivery_method in ('CTS', 'SPEED', 'POST OFFICE', 'SMART DELIVERIES'));
     end if;
-end $;
+end $$;
 
 create table if not exists public.order_items (
     id uuid primary key default gen_random_uuid(),
@@ -113,8 +124,8 @@ begin
     perform p.id from public.products p where p.id = any(v_product_ids) order by p.id for update;
 
     v_reference := 'AC-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 10));
-    insert into public.orders (reference, customer_name, customer_phone, delivery_address, payment_method, delivery_method)
-    values (v_reference, p_customer_name, p_customer_phone, p_delivery_address, p_payment_method, p_delivery_method)
+    insert into public.orders (reference, customer_name, customer_phone, delivery_address, payment_method, payment_status, delivery_method)
+    values (v_reference, p_customer_name, p_customer_phone, p_delivery_address, p_payment_method, 'pending', p_delivery_method)
     returning id into v_order_id;
 
     for v_item in select value from jsonb_array_elements(p_items) loop
