@@ -320,6 +320,7 @@ async function openAdminDashboard() {
 	await loadAdminDashboard();
 	const dashboard = document.querySelector('#admin-dashboard');
 	dashboard.hidden = false;
+	document.body.classList.add('admin-mode');
 	dashboard.scrollIntoView({ behavior: 'smooth' });
 	loadAdminOrders();
 	if (!adminOrdersRefreshTimer) adminOrdersRefreshTimer = setInterval(() => {
@@ -722,6 +723,7 @@ function wireAdminDashboard() {
 	});
 	root.querySelector('#close-admin').addEventListener('click', () => {
 		root.querySelector('#admin-dashboard').hidden = true;
+		document.body.classList.remove('admin-mode');
 		if (adminOrdersRefreshTimer) clearInterval(adminOrdersRefreshTimer);
 		adminOrdersRefreshTimer = null;
 		document.querySelector('#shop').scrollIntoView({ behavior: 'smooth' });
@@ -730,6 +732,7 @@ function wireAdminDashboard() {
 		try {
 			await fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin' });
 		} finally {
+			document.body.classList.remove('admin-mode');
 			adminAuthenticated = false;
 			adminDashboardLoaded = false;
 			if (adminOrdersRefreshTimer) clearInterval(adminOrdersRefreshTimer);
