@@ -35,10 +35,19 @@ create table if not exists public.orders (
     customer_phone text not null,
     delivery_address text not null,
     payment_method text not null check (payment_method in ('Mobile Money', 'Bank transfer', 'Cash on delivery')),
-    status text not null default 'pending' check (status in ('pending', 'confirmed', 'cancelled', 'fulfilled')),
+    delivery_method text check (delivery_method is null or delivery_method in ('CTS', 'SPEED', 'POST OFFICE', 'SMART DELIVERIES')),
+    status not null default 'pending' check (status in ('pending', 'confirmed', 'cancelled', 'fulfilled')),
     subtotal bigint not null default 0 check (subtotal >= 0),
     created_at timestamptz not null default now()
 );
+
+alter table public.orders add column if not exists delivery_method text;
+do $ begin
+    if not exists (select 1 from pg_constraint where conname = 'orders_delivery_method_check' and conrelid = 'public.orders'::regclass) then
+        alter table public.orders add constraint orders_delivery_method_check
+        check (delivery_method is null or delivery_method in ('CTS', 'SPEED', 'POST OFFICE', 'SMART DELIVERIES'));
+    end if;
+end $;
 
 create table if not exists public.order_items (
     id uuid primary key default gen_random_uuid(),
@@ -59,6 +68,7 @@ create or replace function public.create_order(
     p_customer_phone text,
     p_delivery_address text,
     p_payment_method text,
+    p_delivery_method text,
     p_items jsonb
 ) returns jsonb
 language plpgsql
@@ -76,6 +86,9 @@ declare
     v_line_total bigint;
     v_product_ids uuid[] := array[]::uuid[];
 begin
+    if p_delivery_method is null or p_delivery_method not in ('CTS', 'SPEED', 'POST OFFICE', 'SMART DELIVERIES') then
+        raise exception 'Choose a valid delivery method.' using errcode = '22023';
+    end if;
     if jsonb_typeof(p_items) is distinct from 'array' then
         raise exception 'Order items must be a list.' using errcode = '22023';
     end if;
@@ -100,8 +113,8 @@ begin
     perform p.id from public.products p where p.id = any(v_product_ids) order by p.id for update;
 
     v_reference := 'AC-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 10));
-    insert into public.orders (reference, customer_name, customer_phone, delivery_address, payment_method)
-    values (v_reference, p_customer_name, p_customer_phone, p_delivery_address, p_payment_method)
+    insert into public.orders (reference, customer_name, customer_phone, delivery_address, payment_method, delivery_method)
+    values (v_reference, p_customer_name, p_customer_phone, p_delivery_address, p_payment_method, p_delivery_method)
     returning id into v_order_id;
 
     for v_item in select value from jsonb_array_elements(p_items) loop
@@ -128,14 +141,15 @@ begin
         'id', v_order_id,
         'reference', v_reference,
         'status', 'pending',
+        'deliveryMethod', p_delivery_method,
         'subtotal', v_subtotal,
         'items', (select jsonb_agg(jsonb_build_object('name', oi.product_name, 'quantity', oi.quantity, 'unitPrice', oi.unit_price, 'lineTotal', oi.line_total)) from public.order_items oi where oi.order_id = v_order_id)
     );
 end;
 $$;
 
-revoke all on function public.create_order(text, text, text, text, jsonb) from public, anon, authenticated;
-grant execute on function public.create_order(text, text, text, text, jsonb) to service_role;
+revoke all on function public.create_order(text, text, text, text, text, jsonb) from public, anon, authenticated;
+grant execute on function public.create_order(text, text, text, text, text, jsonb) to service_role;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('product-images', 'product-images', true, 5242880, array['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
