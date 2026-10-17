@@ -186,6 +186,7 @@ function renderAdminOrders(orders) {
 		addDetail('Phone', order.customer_phone);
 		addDetail('Delivery address', order.delivery_address);
 		addDetail('Payment method', order.payment_method);
+		addDetail('Delivery service', order.delivery_method || 'Not recorded');
 		const items = document.createElement('ul');
 		items.className = 'admin-order-items';
 		(order.order_items || []).forEach(item => {
@@ -604,6 +605,7 @@ document.querySelector('#checkout-form').addEventListener('submit', event => {
 					phone: formData.get('phone'),
 					address: formData.get('address'),
 					payment: formData.get('payment'),
+					deliveryMethod: formData.get('deliveryMethod'),
 					items: cart.map(item => ({ productId: item.id, quantity: item.quantity }))
 				})
 			});
@@ -618,6 +620,7 @@ document.querySelector('#checkout-form').addEventListener('submit', event => {
 				confirmationItems.append(line);
 			});
 			document.querySelector('#order-reference').textContent = `Order reference: ${result.reference}`;
+			document.querySelector('#confirmation-delivery-method').textContent = result.deliveryMethod || formData.get('deliveryMethod');
 			document.querySelector('#confirmation-total').textContent = formatPrice(result.subtotal);
 			form.hidden = true;
 			document.querySelector('#order-confirmation').hidden = false;
