@@ -37,6 +37,6 @@ The Blueprint currently uses Render's Free web-service plan. Free services sleep
 
 ## Orders
 
-Checkout orders are saved to the `orders` and `order_items` tables by the server-side `create_order` database function. The function recalculates prices from inventory and reserves the requested stock in one transaction. New orders start with `pending` status. Checkout records the selected payment method but does not charge a customer or send an order notification.
+Checkout orders are saved to the `orders` and `order_items` tables by the server-side `create_order` database function. The function recalculates prices from inventory and reserves the requested stock in one transaction. New orders start with `pending` status. Checkout records the selected payment method but does not charge a customer or send an order notification. Customers must also choose CTS, SPEED, POST OFFICE, or SMART DELIVERIES. The selected service is saved with the order and shown in the admin Orders view.
 
 If Supabase was set up before order support was added, run the updated [`supabase/schema.sql`](./supabase/schema.sql) in the SQL Editor to add the order tables and function. The script is safe to rerun for the existing seeded products.
