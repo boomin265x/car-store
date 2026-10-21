@@ -1,0 +1,20 @@
+{
+  "id": "/",
+  "name": "Auto Customs",
+  "short_name": "Auto Customs",
+  "description": "Premium car upgrades for drivers who build with intention.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f2ec",
+  "theme_color": "#17191c",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
+

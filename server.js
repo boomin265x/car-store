@@ -154,7 +154,7 @@ function paymentResultPage(title, message, reference = '', paid = false) {
 	const escapeHtml = value => value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 	const safeReference = reference.replace(/[^A-Za-z0-9-]/g, '');
 	const storeUrl = paid ? '/?payment=paid' : '/';
-	return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)} · Auto Customs</title><body style="font:16px system-ui;background:#111;color:#f5f3ef;display:grid;min-height:100vh;place-items:center;margin:0"><main style="max-width:34rem;padding:2rem"><p style="color:#d98d42;letter-spacing:.12em">AUTO CUSTOMS</p><h1>${escapeHtml(title)}</h1><p>${escapeHtml(message)}</p>${safeReference ? `<p>Order reference: <strong>${safeReference}</strong></p>` : ''}<a style="color:#f0a85f" href="${storeUrl}">Return to the store</a></main></body></html>`;
+	return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)} Â· Auto Customs</title><body style="font:16px system-ui;background:#111;color:#f5f3ef;display:grid;min-height:100vh;place-items:center;margin:0"><main style="max-width:34rem;padding:2rem"><p style="color:#d98d42;letter-spacing:.12em">AUTO CUSTOMS</p><h1>${escapeHtml(title)}</h1><p>${escapeHtml(message)}</p>${safeReference ? `<p>Order reference: <strong>${safeReference}</strong></p>` : ''}<a style="color:#f0a85f" href="${storeUrl}">Return to the store</a></main></body></html>`;
 }
 
 async function handlePayChanguReturn(request, response) {
@@ -221,7 +221,7 @@ function validateOrder(order) {
 
 function sendFile(request, response, pathname) {
 	const requestedPath = pathname === '/' ? 'index.html' : decodeURIComponent(pathname.slice(1));
-	const publicFiles = new Set(['index.html', 'script.js', 'style.css']);
+	const publicFiles = new Set(['index.html', 'script.js', 'style.css', 'manifest.webmanifest', 'service-worker.js', 'icons/icon.svg']);
 	if (!publicFiles.has(requestedPath)) {
 		response.writeHead(404);
 		response.end('Not found');
@@ -233,7 +233,7 @@ function sendFile(request, response, pathname) {
 		response.end('Forbidden');
 		return;
 	}
-	const contentTypes = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8' };
+	const contentTypes = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.webmanifest': 'application/manifest+json; charset=utf-8', '.svg': 'image/svg+xml' };
 	fs.readFile(resolvedPath, (error, content) => {
 		if (error) {
 			response.writeHead(error.code === 'ENOENT' ? 404 : 500);
@@ -510,3 +510,4 @@ server.listen(port, () => {
 	if (!supabaseUrl || !serviceKey) console.warn('Supabase is not configured; add the values to .env before using the inventory API.');
 	if (!adminEmail || !adminPassword) console.warn('Admin credentials are not configured; set ADMIN_EMAIL and ADMIN_PASSWORD in .env.');
 });
+
