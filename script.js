@@ -74,7 +74,33 @@ let adminOrders = [];
 let loginReturnFocus = null;
 let productModalReturnFocus = null;
 
+function closeOptionsMenu() {
+	const menu = document.querySelector('#site-options-menu');
+	const toggle = document.querySelector('#options-menu-toggle');
+	menu.hidden = true;
+	toggle.setAttribute('aria-expanded', 'false');
+}
+
+function setupOptionsMenu() {
+	const toggle = document.querySelector('#options-menu-toggle');
+	const menu = document.querySelector('#site-options-menu');
+	toggle.addEventListener('click', () => {
+		menu.hidden = !menu.hidden;
+		toggle.setAttribute('aria-expanded', String(!menu.hidden));
+	});
+	menu.addEventListener('click', event => {
+		if (event.target.closest('a[data-menu-link]')) closeOptionsMenu();
+	});
+	document.addEventListener('click', event => {
+		if (!menu.contains(event.target) && !toggle.contains(event.target)) closeOptionsMenu();
+	});
+	document.addEventListener('keydown', event => {
+		if (event.key === 'Escape') closeOptionsMenu();
+	});
+}
+
 function closeNavigationOverlays() {
+	closeOptionsMenu();
 	document.querySelector('#login-screen').hidden = true;
 	document.querySelector('#cart-drawer').hidden = true;
 	document.querySelector('#checkout-panel').hidden = true;
@@ -478,6 +504,7 @@ function setupAppInstall() {
 	if (isIOS && isSafari) installButton.hidden = false;
 
 	installButton.addEventListener('click', async () => {
+		closeOptionsMenu();
 		if (pendingInstallPrompt) {
 			pendingInstallPrompt.prompt();
 			await pendingInstallPrompt.userChoice;
@@ -496,6 +523,7 @@ function setupAppInstall() {
 if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
 	window.addEventListener('load', () => navigator.serviceWorker.register('/service-worker.js').catch(() => {}));
 }
+setupOptionsMenu();
 setupAppInstall();
 
 document.querySelectorAll('.filter').forEach(button => button.addEventListener('click', () => {
