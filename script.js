@@ -89,13 +89,7 @@ function setupOptionsMenu() {
 		toggle.setAttribute('aria-expanded', String(!menu.hidden));
 	});
 	menu.addEventListener('click', event => {
-		const infoButton = event.target.closest('[data-open-info]');
-		if (!infoButton) return;
-		closeOptionsMenu();
-		document.querySelector(`#${infoButton.dataset.openInfo}-dialog`).showModal();
-	});
-	document.querySelectorAll('[data-close-info]').forEach(button => {
-		button.addEventListener('click', () => button.closest('dialog').close());
+		if (event.target.closest('a[data-menu-link]')) closeOptionsMenu();
 	});
 	document.addEventListener('click', event => {
 		if (!menu.contains(event.target) && !toggle.contains(event.target)) closeOptionsMenu();

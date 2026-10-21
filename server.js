@@ -221,7 +221,7 @@ function validateOrder(order) {
 
 function sendFile(request, response, pathname) {
 	const requestedPath = pathname === '/' ? 'index.html' : decodeURIComponent(pathname.slice(1));
-	const publicFiles = new Set(['index.html', 'script.js', 'style.css', 'manifest.webmanifest', 'service-worker.js', 'icons/icon.svg']);
+	const publicFiles = new Set(['index.html', 'script.js', 'style.css', 'manifest.webmanifest', 'service-worker.js', 'icons/icon.svg', 'about.html', 'contact.html']);
 	if (!publicFiles.has(requestedPath)) {
 		response.writeHead(404);
 		response.end('Not found');

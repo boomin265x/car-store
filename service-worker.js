@@ -1,11 +1,13 @@
-const CACHE_NAME = 'auto-customs-shell-v4';
+const CACHE_NAME = 'auto-customs-shell-v5';
 const APP_SHELL = [
 	'/',
 	'/index.html',
 	'/style.css',
 	'/script.js',
 	'/manifest.webmanifest',
-	'/icons/icon.svg'
+	'/icons/icon.svg',
+	'/about.html',
+	'/contact.html'
 ];
 
 self.addEventListener('install', event => {
@@ -23,9 +25,9 @@ self.addEventListener('fetch', event => {
 
 	if (request.mode === 'navigate') {
 		event.respondWith(fetch(request).then(response => {
-			if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put('/index.html', response.clone()));
+			if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
 			return response;
-		}).catch(async () => (await caches.match('/index.html')) || Response.error()));
+		}).catch(async () => (await caches.match(request)) || (await caches.match('/index.html')) || Response.error()));
 		return;
 	}
 
