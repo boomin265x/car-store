@@ -1,17 +1,6 @@
-const defaultProducts = [
-	{ name: 'Apex RS-7', category: 'wheels', description: 'Lightweight forged wheels with a sharp satin finish.', compatibility: 'Universal fitment', stock: 12, meta: '18 x 8.5 / Satin black', price: 899000, badge: 'Best seller', image: 'https://images.unsplash.com/photo-1553440569-bcc63803a83d?auto=format&fit=crop&w=700&q=80' },
-	{ name: 'Lowline Splitter', category: 'exterior', meta: 'Gloss carbon / universal', price: 245000, badge: 'New', image: 'https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?auto=format&fit=crop&w=700&q=80' },
-	{ name: 'Pulse 10 Subwoofer', category: 'audio', meta: '10 inch / 600 watts', price: 329000, badge: '', image: 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?auto=format&fit=crop&w=700&q=80' },
-	{ name: 'Nightshift Film', category: 'tint', meta: '35% / 20 in x 10 ft', price: 74000, badge: '', image: 'https://images.unsplash.com/photo-1580273916550-e323be2ae537?auto=format&fit=crop&w=700&q=80' },
-	{ name: 'Forge 5 Spoke', category: 'wheels', meta: '19 x 9 / Gunmetal', price: 1120000, badge: '', image: 'https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?auto=format&fit=crop&w=700&q=80' },
-	{ name: 'Streetline Spoiler', category: 'exterior', meta: 'ABS / paint-ready', price: 390000, badge: '', image: 'https://images.unsplash.com/photo-1542282088-fe8426682b8f?auto=format&fit=crop&w=700&q=80' },
-	{ name: 'Arc 2-Way Kit', category: 'audio', meta: '6.5 inch / component', price: 189000, badge: '', image: 'https://images.unsplash.com/photo-1545454675-3531b543be5d?auto=format&fit=crop&w=700&q=80' },
-	{ name: 'Solarblock 05', category: 'tint', meta: '5% / 24 in x 10 ft', price: 86000, badge: '', image: 'https://images.unsplash.com/photo-1511919884226-fd3cad34687c?auto=format&fit=crop&w=700&q=80' },
-	{ name: 'Lumen Pro LED Kit', category: 'lights', meta: '6000K / plug and play', price: 145000, badge: 'New', image: 'https://images.unsplash.com/photo-1493238792000-8113da705763?auto=format&fit=crop&w=700&q=80' },
-	{ name: 'Heritage Shift Kit', category: 'interior', meta: 'Leather / brushed alloy', price: 185000, badge: '', image: 'https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?auto=format&fit=crop&w=700&q=80' }
-];
-
-let products = defaultProducts.map(product => ({ description: 'Premium upgrade selected for fit, function, and finish.', compatibility: 'Check vehicle fitment', stock: 10, ...product }));
+let products = [];
+let productsLoaded = false;
+let productLoadError = false;
 
 const grid = document.querySelector('#product-grid');
 const toast = document.querySelector('#toast');
@@ -359,12 +348,25 @@ function addProductToCart(product) {
 }
 
 function renderProducts() {
+	if (!productsLoaded) {
+		grid.innerHTML = '<p class="products-message" role="status">Loading products…</p>';
+		return;
+	}
 	const searchTerm = document.querySelector('#product-search').value.trim().toLowerCase();
-	let visible = products.filter(product => {
+	const visible = products.filter(product => {
 		const matchesCategory = currentFilter === 'all' || product.category === currentFilter;
 		const searchableText = `${product.name} ${product.category} ${product.description} ${product.meta} ${product.compatibility}`.toLowerCase();
 		return matchesCategory && (!searchTerm || searchableText.includes(searchTerm));
 	});
+	if (!visible.length) {
+		const message = productLoadError
+			? 'Products could not be loaded. Check your connection and refresh to try again.'
+			: searchTerm
+				? 'No products match your search.'
+				: 'No products are available right now.';
+		grid.innerHTML = `<p class="products-message" role="status">${message}</p>`;
+		return;
+	}
 	grid.innerHTML = visible.map((product, index) => `<article class="product-card motion-reveal" data-product="${product.name}" style="--reveal-delay:${Math.min(index, 6) * 65}ms"><div class="product-image"><img src="${product.image}" alt="${product.name}" loading="lazy">${product.badge ? `<span class="badge">${product.badge}</span>` : ''}<button class="quick-add" data-product="${product.name}" type="button">View details +</button></div><div class="product-info"><h3>${product.name}</h3><p class="product-description">${product.description}</p><div class="product-meta">${product.meta}</div><div class="compatibility">Fits: ${product.compatibility}</div><div class="stock-status${product.stock > 0 ? '' : ' out-of-stock'}">${product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}</div><div class="price">${formatPrice(product.price)}</div></div></article>`).join('');
 	observeRevealElements(grid);
 }
@@ -384,12 +386,21 @@ async function loadProducts() {
 		const response = await fetch('/api/products');
 		const result = await response.json();
 		if (!response.ok) throw new Error(result.error || 'Could not load inventory');
+		if (!Array.isArray(result)) throw new Error('The product list was not valid');
 		products = result;
+		productsLoaded = true;
+		productLoadError = false;
 		renderProducts();
 		renderInventory();
 		renderOffers();
 	} catch (error) {
-		showToast(`Inventory is using preview data: ${error.message}`);
+		products = [];
+		productsLoaded = true;
+		productLoadError = true;
+		renderProducts();
+		renderInventory();
+		renderOffers();
+		showToast('Could not load products. Check your connection.');
 	}
 }
 

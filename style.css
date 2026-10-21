@@ -332,3 +332,5 @@ body { padding-bottom: 70px; }
 	.motion-enabled .motion-reveal { opacity: 1; transform: none; }
 }
 
+
+.products-message { color: var(--muted); font-size: 13px; grid-column: 1 / -1; line-height: 1.6; padding: 34px 0; }
