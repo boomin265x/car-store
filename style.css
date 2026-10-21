@@ -341,12 +341,17 @@ body { padding-bottom: 70px; }
 
 .products-message { color: var(--muted); font-size: 13px; grid-column: 1 / -1; line-height: 1.6; padding: 34px 0; }
 
-.info-dialog { background: var(--paper); border: 1px solid var(--line); color: var(--ink); max-width: min(520px, calc(100vw - 32px)); padding: 38px; position: relative; width: 100%; }
-.info-dialog::backdrop { background: rgba(17,17,17,.72); }
-.info-dialog .eyebrow { color: #9d7740; margin: 0 0 14px; }
-.info-dialog h2 { font-size: clamp(34px, 7vw, 48px); line-height: 1.08; margin: 0 0 18px; }
-.info-dialog h2 i { color: #9d7740; font-family: Georgia,serif; font-weight: 400; }
-.info-dialog > p:not(.eyebrow) { color: #6f6b64; font-size: 14px; line-height: 1.65; margin: 0 0 20px; }
-.info-dialog-close { background: transparent; border: 0; font-size: 25px; position: absolute; right: 14px; top: 10px; }
-.options-menu-action { background: transparent; border: 0; color: var(--ink); font: 12px 'Space Grotesk', sans-serif; padding: 12px; text-align: left; }
-.options-menu-action:hover { background: #ebe7df; color: #9d7740; }
+.info-page { background: var(--paper); min-height: 100vh; }
+.info-page-header { display: flex; justify-content: space-between; min-height: 78px; padding: 0 6vw; }
+.info-page-header > .brand { color: var(--ink); font-size: 11px; grid-column: auto; justify-self: auto; text-decoration: none; }
+.info-page-header > .brand b { color: var(--ink); display: block; font-family: 'Arial Black', 'Space Grotesk', sans-serif; font-size: 27px; letter-spacing: -.075em; line-height: .9; margin-top: 3px; }
+.info-home-link { align-self: center; color: var(--ink); font: 10px 'DM Mono', monospace; text-decoration: none; text-transform: uppercase; }
+.info-home-link:hover { color: #9d7740; }
+.info-page-main { display: flex; flex-direction: column; justify-content: center; margin: 0 auto; max-width: 900px; min-height: calc(100vh - 78px); padding: 70px 8vw 110px; }
+.info-page-main .eyebrow { color: #9d7740; margin-bottom: 20px; }
+.info-page-main h1 { font-size: clamp(48px, 8vw, 88px); line-height: 1.02; margin: 0 0 28px; max-width: 780px; }
+.info-page-main h1 i { color: #9d7740; font-family: Georgia,serif; font-weight: 400; }
+.info-page-main > p:not(.eyebrow) { color: #6f6b64; font-size: 16px; line-height: 1.7; margin: 0 0 30px; max-width: 620px; }
+.info-page-main .button { align-self: flex-start; text-decoration: none; }
+.info-contact-actions { display: flex; flex-wrap: wrap; gap: 18px; }
+@media (max-width: 600px) { .info-page-header { padding: 0 6vw; } .info-page-main { min-height: calc(100vh - 78px); padding: 55px 7vw 95px; } .info-page-main h1 { font-size: 48px; } }
