@@ -355,3 +355,7 @@ body { padding-bottom: 70px; }
 .info-page-main .button { align-self: flex-start; text-decoration: none; }
 .info-contact-actions { display: flex; flex-wrap: wrap; gap: 18px; }
 @media (max-width: 600px) { .info-page-header { padding: 0 6vw; } .info-page-main { min-height: calc(100vh - 78px); padding: 55px 7vw 95px; } .info-page-main h1 { font-size: 48px; } }
+
+.info-contact-actions a.button { background: #0b6b3a; border: 1px solid #0b6b3a; color: #fff; font-size: 12px; font-weight: 600; padding: 14px 18px; text-decoration: none; }
+.info-contact-actions a.button:hover { background: #084f2c; border-color: #084f2c; color: #fff; }
+.info-contact-actions .whatsapp-icon { stroke: #fff; }
