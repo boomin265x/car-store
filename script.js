@@ -148,6 +148,7 @@ async function loadAdminDashboard() {
 	adminDashboardLoaded = true;
 	wireAdminDashboard();
 	renderInventory();
+	renderAdminOffers();
 }
 
 function renderAdminOrders(orders) {
@@ -393,7 +394,7 @@ function renderProducts() {
 		grid.innerHTML = `<p class="products-message" role="status">${message}</p>`;
 		return;
 	}
-	grid.innerHTML = visible.map((product, index) => `<article class="product-card motion-reveal" data-product="${product.name}" style="--reveal-delay:${Math.min(index, 6) * 65}ms"><div class="product-image"><img src="${product.image}" alt="${product.name}" loading="lazy">${product.badge ? `<span class="badge">${product.badge}</span>` : ''}<button class="quick-add" data-product="${product.name}" type="button">View details +</button></div><div class="product-info"><h3>${product.name}</h3><p class="product-description">${product.description}</p><div class="product-meta">${product.meta}</div><div class="compatibility">Fits: ${product.compatibility}</div><div class="stock-status${product.stock > 0 ? '' : ' out-of-stock'}">${product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}</div><div class="price">${formatPrice(product.price)}</div></div></article>`).join('');
+	grid.innerHTML = visible.map((product, index) => `<article class="product-card motion-reveal" data-product="${product.name}" style="--reveal-delay:${Math.min(index, 6) * 65}ms"><div class="product-image"><img src="${product.image}" alt="${product.name}" loading="lazy">${displayProductBadge(product) ? `<span class="badge">${displayProductBadge(product)}</span>` : ''}<button class="quick-add" data-product="${product.name}" type="button">View details +</button></div><div class="product-info"><h3>${product.name}</h3><p class="product-description">${product.description}</p><div class="product-meta">${product.meta}</div><div class="compatibility">Fits: ${product.compatibility}</div><div class="stock-status${product.stock > 0 ? '' : ' out-of-stock'}">${product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}</div><div class="price">${formatPrice(product.price)}</div></div></article>`).join('');
 	observeRevealElements(grid);
 }
 
@@ -405,6 +406,49 @@ function renderInventory() {
 	const visible = products.filter(product => product.name.toLowerCase().includes(searchTerm) || product.category.includes(searchTerm));
 	document.querySelector('#inventory-count').textContent = `${products.length} item${products.length === 1 ? '' : 's'}`;
 	list.innerHTML = visible.length ? visible.map(product => `<div class="inventory-row"><img src="${product.image}" alt=""><div><strong>${product.name}</strong><small>${product.category} · ${formatPrice(product.price)} · ${product.stock} in stock</small></div><button class="delete-product" data-product-id="${product.id}" type="button" aria-label="Delete ${product.name}">Delete</button></div>`).join('') : '<p class="empty-inventory">No matching products.</p>';
+}
+
+function renderAdminOffers() {
+	const list = document.querySelector('#admin-offer-list');
+	const count = document.querySelector('#admin-offer-count');
+	const status = document.querySelector('#admin-offers-status');
+	const search = document.querySelector('#admin-offer-search');
+	if (!list || !count || !status) return;
+	const term = (search?.value || '').trim().toLowerCase();
+	const visible = products.filter(product => `${product.name} ${product.category}`.toLowerCase().includes(term));
+	count.textContent = `${products.length} product${products.length === 1 ? '' : 's'}`;
+	list.replaceChildren();
+	if (!visible.length) {
+		status.textContent = products.length ? 'No products match your search.' : 'Add products to inventory before managing offers.';
+		return;
+	}
+	visible.forEach(product => {
+		const row = document.createElement('article');
+		row.className = 'admin-offer-row';
+		const image = document.createElement('img');
+		image.src = product.image;
+		image.alt = '';
+		const details = document.createElement('div');
+		details.className = 'admin-offer-details';
+		const name = document.createElement('strong');
+		name.textContent = product.name;
+		const meta = document.createElement('small');
+		meta.textContent = `${product.category} · ${formatPrice(product.price)} · ${product.stock} in stock`;
+		details.append(name, meta);
+		const enabled = isProductOffer(product);
+		const state = document.createElement('span');
+		state.className = 'offer-management-state';
+		state.textContent = enabled ? 'In offers' : 'Not in offers';
+		const button = document.createElement('button');
+		button.className = 'offer-toggle';
+		button.type = 'button';
+		button.dataset.productId = product.id;
+		button.textContent = enabled ? 'Remove' : 'Add to offers';
+		button.setAttribute('aria-pressed', String(enabled));
+		row.append(image, details, state, button);
+		list.append(row);
+	});
+	status.textContent = `Showing ${visible.length} of ${products.length} product${products.length === 1 ? '' : 's'}.`;
 }
 
 async function loadProducts() {
@@ -419,6 +463,7 @@ async function loadProducts() {
 		renderProducts();
 		renderInventory();
 		renderOffers();
+		renderAdminOffers();
 	} catch (error) {
 		products = [];
 		productsLoaded = true;
@@ -426,12 +471,27 @@ async function loadProducts() {
 		renderProducts();
 		renderInventory();
 		renderOffers();
+		renderAdminOffers();
 		showToast('Could not load products. Check your connection.');
 	}
 }
 
+function isProductOffer(product) {
+	return product.badge === 'New' || product.badge.startsWith('New::');
+}
+
+function displayProductBadge(product) {
+	return product.badge.startsWith('New::') ? product.badge.slice(5) : product.badge;
+}
+
+function offerBadgeValue(product, enabled) {
+	if (!enabled) return product.badge.startsWith('New::') ? product.badge.slice(5) : '';
+	if (product.badge && product.badge !== 'New' && !product.badge.startsWith('New::')) return `New::${product.badge}`;
+	return 'New';
+}
+
 function renderOffers() {
-	const offers = products.filter(product => product.badge === 'New' && product.stock > 0);
+	const offers = products.filter(product => isProductOffer(product) && product.stock > 0);
 	const offerList = document.querySelector('#offer-list');
 	document.querySelectorAll('.notification-count').forEach(offerCount => {
 		offerCount.textContent = offers.length;
@@ -816,6 +876,38 @@ function wireAdminDashboard() {
 	root.querySelector('#refresh-orders').addEventListener('click', loadAdminOrders);
 	root.querySelector('#customer-search').addEventListener('input', () => renderAdminCustomers(adminOrders));
 	root.querySelectorAll('[data-admin-view]').forEach(button => button.addEventListener('click', () => showAdminView(button.dataset.adminView)));
+	root.querySelector('#admin-offer-search').addEventListener('input', renderAdminOffers);
+	root.querySelector('#admin-offer-list').addEventListener('click', async event => {
+		const button = event.target.closest('.offer-toggle');
+		if (!button || button.disabled) return;
+		const product = products.find(item => item.id === button.dataset.productId);
+		if (!product) return;
+		const enabled = !isProductOffer(product);
+		const badge = offerBadgeValue(product, enabled);
+		if (badge.length > 40) return showToast('This product label is too long to keep while adding it to offers');
+		button.disabled = true;
+		button.textContent = 'Saving…';
+		try {
+			const response = await fetch(`/api/products/${encodeURIComponent(product.id)}`, {
+				method: 'PATCH',
+				credentials: 'same-origin',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ badge })
+			});
+			const result = await response.json();
+			if (!response.ok || result.updated !== true) throw new Error(result.error || 'Could not update this offer');
+			product.badge = result.badge;
+			renderProducts();
+			renderInventory();
+			renderOffers();
+			renderAdminOffers();
+			showToast(enabled ? `${product.name} added to offers` : `${product.name} removed from offers`);
+		} catch (error) {
+			showToast(`Could not update offer: ${error.message}`);
+			button.disabled = false;
+			button.textContent = enabled ? 'Remove' : 'Add to offers';
+		}
+	});
 	root.querySelector('#product-form').addEventListener('submit', async event => {
 		event.preventDefault();
 		const formData = new FormData(event.target);
@@ -845,6 +937,7 @@ function wireAdminDashboard() {
 			renderProducts();
 			renderInventory();
 			renderOffers();
+			renderAdminOffers();
 			event.target.reset();
 			if (imagePreview.dataset.objectUrl) URL.revokeObjectURL(imagePreview.dataset.objectUrl);
 			imagePreview.removeAttribute('src');
@@ -872,6 +965,7 @@ function wireAdminDashboard() {
 			renderProducts();
 			renderInventory();
 			renderOffers();
+			renderAdminOffers();
 			showToast(`${product.name} removed from inventory`);
 		} catch (error) {
 			showToast(`Could not remove product: ${error.message}`);
