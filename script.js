@@ -56,7 +56,7 @@ function renderCart() {
 		const product = products.find(candidate => candidate.name === item.name);
 		const stock = product ? product.stock : 0;
 		const availability = product ? `${stock} available` : 'No longer available';
-		return `<div class="cart-item"><img src="${item.image}" alt=""><div class="cart-item-copy"><strong>${item.name}</strong><small>${formatPrice(item.price)}</small><small>${availability}</small><div class="quantity-controls"><button data-cart-action="decrease" data-product="${item.name}" type="button" aria-label="Decrease ${item.name} quantity">−</button><span>${item.quantity}</span><button data-cart-action="increase" data-product="${item.name}" type="button" aria-label="Increase ${item.name} quantity"${!product || item.quantity >= stock ? ' disabled' : ''}>+</button></div></div><button class="remove-item" data-cart-action="remove" data-product="${item.name}" type="button">Remove</button></div>`;
+		return `<div class="cart-item"><img src="${item.image}" alt=""><div class="cart-item-copy"><strong>${item.name}</strong><small>${formatPrice(item.price)}</small><small>${availability}</small><div class="quantity-controls"><button data-cart-action="decrease" data-product="${item.name}" type="button" aria-label="Decrease ${item.name} quantity">âˆ’</button><span>${item.quantity}</span><button data-cart-action="increase" data-product="${item.name}" type="button" aria-label="Increase ${item.name} quantity"${!product || item.quantity >= stock ? ' disabled' : ''}>+</button></div></div><button class="remove-item" data-cart-action="remove" data-product="${item.name}" type="button">Remove</button></div>`;
 	}).join('') : '<p class="empty-cart">Your bag is waiting for its first upgrade.</p>';
 }
 
@@ -182,7 +182,7 @@ function renderAdminOrders(orders) {
 		(order.order_items || []).forEach(item => {
 			const line = document.createElement('li');
 			const name = document.createElement('span');
-			name.textContent = `${item.product_name} × ${item.quantity}`;
+			name.textContent = `${item.product_name} Ã— ${item.quantity}`;
 			const amount = document.createElement('span');
 			amount.textContent = formatPrice(item.line_total);
 			line.append(name, amount);
@@ -290,7 +290,7 @@ async function loadAdminOrders() {
 	const refreshButton = root?.querySelector('#refresh-orders');
 	if (!list || !status) return;
 	if (refreshButton) refreshButton.disabled = true;
-	status.textContent = 'Loading customer orders…';
+	status.textContent = 'Loading customer ordersâ€¦';
 	try {
 		const response = await fetch('/api/admin/orders', { credentials: 'same-origin' });
 		const result = await response.json();
@@ -376,7 +376,7 @@ function renderInventory() {
 	const searchTerm = search.value.toLowerCase();
 	const visible = products.filter(product => product.name.toLowerCase().includes(searchTerm) || product.category.includes(searchTerm));
 	document.querySelector('#inventory-count').textContent = `${products.length} item${products.length === 1 ? '' : 's'}`;
-	list.innerHTML = visible.length ? visible.map(product => `<div class="inventory-row"><img src="${product.image}" alt=""><div><strong>${product.name}</strong><small>${product.category} · ${formatPrice(product.price)} · ${product.stock} in stock</small></div><button class="delete-product" data-product-id="${product.id}" type="button" aria-label="Delete ${product.name}">Delete</button></div>`).join('') : '<p class="empty-inventory">No matching products.</p>';
+	list.innerHTML = visible.length ? visible.map(product => `<div class="inventory-row"><img src="${product.image}" alt=""><div><strong>${product.name}</strong><small>${product.category} Â· ${formatPrice(product.price)} Â· ${product.stock} in stock</small></div><button class="delete-product" data-product-id="${product.id}" type="button" aria-label="Delete ${product.name}">Delete</button></div>`).join('') : '<p class="empty-inventory">No matching products.</p>';
 }
 
 async function loadProducts() {
@@ -427,7 +427,7 @@ function renderOffers() {
 		const description = document.createElement('p');
 		description.textContent = product.description;
 		const details = document.createElement('small');
-		details.textContent = `${product.stock} in stock · ${formatPrice(product.price)}`;
+		details.textContent = `${product.stock} in stock Â· ${formatPrice(product.price)}`;
 		const button = document.createElement('button');
 		button.className = 'button button-dark';
 		button.type = 'button';
@@ -444,6 +444,48 @@ function showToast(message) {
 	toast.classList.add('visible');
 	setTimeout(() => toast.classList.remove('visible'), 2400);
 }
+
+function setupAppInstall() {
+	const installButton = document.querySelector('#install-app');
+	const instructions = document.querySelector('#install-instructions');
+	let pendingInstallPrompt = null;
+	const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+	const isSafari = /Safari/.test(navigator.userAgent) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(navigator.userAgent);
+	const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+	if (isStandalone) return;
+
+	window.addEventListener('beforeinstallprompt', event => {
+		event.preventDefault();
+		pendingInstallPrompt = event;
+		installButton.hidden = false;
+	});
+	window.addEventListener('appinstalled', () => {
+		pendingInstallPrompt = null;
+		installButton.hidden = true;
+		showToast('Auto Customs added to your phone');
+	});
+	if (isIOS && isSafari) installButton.hidden = false;
+
+	installButton.addEventListener('click', async () => {
+		if (pendingInstallPrompt) {
+			pendingInstallPrompt.prompt();
+			await pendingInstallPrompt.userChoice;
+			pendingInstallPrompt = null;
+			installButton.hidden = true;
+			return;
+		}
+		if (typeof instructions.showModal === 'function') instructions.showModal();
+		else showToast('In Safari, tap Share, then Add to Home Screen');
+	});
+	const closeInstructions = () => instructions.close();
+	document.querySelector('#install-close').addEventListener('click', closeInstructions);
+	document.querySelector('#install-done').addEventListener('click', closeInstructions);
+}
+
+if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
+	window.addEventListener('load', () => navigator.serviceWorker.register('/service-worker.js').catch(() => {}));
+}
+setupAppInstall();
 
 document.querySelectorAll('.filter').forEach(button => button.addEventListener('click', () => {
 	document.querySelector('.filter.active').classList.remove('active');
@@ -691,7 +733,7 @@ document.querySelector('#password-toggle').addEventListener('click', event => {
 	passwordInput.type = isVisible ? 'password' : 'text';
 	event.currentTarget.setAttribute('aria-label', isVisible ? 'Show password' : 'Hide password');
 	event.currentTarget.setAttribute('aria-pressed', String(!isVisible));
-	event.currentTarget.textContent = isVisible ? '◉' : '◎';
+	event.currentTarget.textContent = isVisible ? 'â—‰' : 'â—Ž';
 });
 
 function wireAdminDashboard() {
@@ -779,7 +821,7 @@ function wireAdminDashboard() {
 		const product = products.find(item => item.id === button.dataset.productId);
 		if (!product) return;
 		button.disabled = true;
-		button.textContent = 'Deleting…';
+		button.textContent = 'Deletingâ€¦';
 		try {
 			const response = await fetch(`/api/products/${encodeURIComponent(product.id)}`, {
 				method: 'DELETE',
@@ -812,3 +854,4 @@ renderOffers();
 closeNavigationOverlays();
 loadProducts();
 restoreAdminSession();
+
