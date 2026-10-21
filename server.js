@@ -474,6 +474,28 @@ const server = http.createServer(async (request, response) => {
 				return;
 			}
 			const productId = pathname.match(/^\/api\/products\/([0-9a-f-]+)$/i)?.[1];
+			if (request.method === 'PATCH' && productId) {
+				if (!sessionFromRequest(request)) {
+					json(response, 401, { error: 'Sign in as an administrator before changing inventory.' });
+					return;
+				}
+				const update = await readJson(request);
+				if (!update || typeof update !== 'object' || Array.isArray(update) || Object.keys(update).length !== 1 || typeof update.badge !== 'string' || update.badge.length > 40) {
+					json(response, 400, { error: 'Offer update must include a valid product badge.' });
+					return;
+				}
+				const updated = await supabaseRequest(`products?id=eq.${encodeURIComponent(productId)}&select=id,badge`, {
+					method: 'PATCH',
+					headers: { Prefer: 'return=representation' },
+					body: JSON.stringify({ badge: update.badge })
+				});
+				if (!Array.isArray(updated) || updated.length === 0) {
+					json(response, 404, { error: 'Product was not found. Refresh inventory and try again.' });
+					return;
+				}
+				json(response, 200, { updated: true, id: productId, badge: updated[0].badge });
+				return;
+			}
 			if (request.method === 'DELETE' && productId) {
 				if (!sessionFromRequest(request)) {
 					json(response, 401, { error: 'Sign in as an administrator before changing inventory.' });
