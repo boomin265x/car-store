@@ -19,11 +19,16 @@
 </head>
 <body>
     <header class="site-header">
-        <button class="menu-button" aria-label="Open menu">☰</button>
+        <div class="menu-wrap">
+            <button class="menu-button" id="options-menu-toggle" type="button" aria-label="Open options" aria-expanded="false" aria-controls="site-options-menu">☰</button>
+            <nav class="site-options-menu" id="site-options-menu" aria-label="Store options" hidden>
+                <a href="#shop" data-menu-link>Shop all</a>
+                <a href="#about-info" data-menu-link>About</a>
+                <a href="#contact-info" data-menu-link>Contact</a>
+                
+            </nav>
+        </div>
         <a class="brand" href="#top" aria-label="Auto Customs home"><span>AUTO<br><b>CUSTOMS</b></span></a>
-        <nav class="main-nav" aria-label="Main navigation">
-            <a href="#shop">Shop all</a>
-        </nav>
         <div class="header-actions"><button class="install-app-button" id="install-app" type="button" hidden>Install app</button><button class="notification-toggle" id="header-notifications" type="button" aria-label="Open notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span class="notification-count notification-badge" hidden></span></button></div>
     </header>
 
