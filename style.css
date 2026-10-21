@@ -25,6 +25,9 @@ button { cursor: pointer; }
 .header-actions { align-items: center; display: flex; gap: 22px; grid-column: 3; grid-row: 1; justify-self: end; }
 .notification-toggle { align-items: center; background: transparent; border: 0; color: var(--ink); display: inline-flex; height: 42px; justify-content: center; padding: 8px; position: relative; width: 42px; }
 .notification-toggle:hover { color: #9d7740; }
+.install-app-button { background: var(--acid); border: 1px solid var(--acid); color: var(--ink); font: 10px 'DM Mono', monospace; padding: 10px 13px; text-transform: uppercase; }
+.install-app-button:hover { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.install-app-button[hidden] { display: none; }
 .notification-toggle svg { fill: none; height: 23px; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.6; width: 23px; }
 .notification-badge { align-items: center; background: var(--acid); border-radius: 50%; color: var(--ink); display: inline-flex; font: 9px 'DM Mono', monospace; height: 16px; justify-content: center; min-width: 16px; padding: 0 3px; position: absolute; right: 0; top: 1px; }
 .notification-badge[hidden] { display: none; }
@@ -138,6 +141,13 @@ footer small { justify-self: end; }
 .bottom-nav-item b { background: var(--acid); border-radius: 50%; color: var(--ink); font: 9px 'DM Mono', monospace; min-width: 17px; padding: 3px; position: absolute; right: 16px; top: 2px; }
 .toast { background: var(--acid); bottom: 20px; font: 11px 'DM Mono', monospace; opacity: 0; padding: 15px 20px; position: fixed; right: 20px; transform: translateY(20px); transition: .3s; z-index: 5; }
 .toast.visible { opacity: 1; transform: translateY(0); }
+.install-instructions { background: var(--paper); border: 1px solid var(--line); color: var(--ink); max-width: min(440px, calc(100vw - 32px)); padding: 34px; width: 100%; }
+.install-instructions::backdrop { background: rgba(17, 17, 17, .72); }
+.install-instructions h2 { font-size: 29px; line-height: 1.1; margin: 10px 0 14px; }
+.install-instructions h2 i { color: #9d7740; font-family: Georgia, serif; font-weight: 400; }
+.install-instructions > p:not(.eyebrow) { color: #6f6b64; font-size: 14px; line-height: 1.6; margin-bottom: 24px; }
+.install-close { background: transparent; border: 0; font-size: 25px; position: absolute; right: 14px; top: 10px; }
+@media (max-width: 390px) { .site-header { padding-left: 4vw; padding-right: 4vw; } .install-app-button { font-size: 9px; padding: 9px 8px; } }
 .cart-drawer { background: var(--paper); box-shadow: -18px 0 45px rgba(23,25,28,.18); display: flex; flex-direction: column; height: 100vh; max-width: 480px; padding: 38px 38px 105px; position: fixed; right: 0; top: 0; width: 100%; z-index: 30; }
 .cart-drawer[hidden] { display: none; }
 .cart-drawer-header { align-items: start; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; padding-bottom: 25px; }
@@ -321,3 +331,4 @@ body { padding-bottom: 70px; }
 	*, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
 	.motion-enabled .motion-reveal { opacity: 1; transform: none; }
 }
+
